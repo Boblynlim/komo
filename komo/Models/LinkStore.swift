@@ -30,7 +30,7 @@ class LinkStore: ObservableObject {
         case .archive:
             result = links.filter { $0.isArchived }
         case .tag(let tag):
-            result = links.filter { $0.tags.contains(tag) && !$0.isArchived }
+            result = links.filter { $0.tags.contains(tag) }
         case .search:
             result = links
         }
