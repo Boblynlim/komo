@@ -1,0 +1,26 @@
+name: komo
+options:
+  bundleIdPrefix: com.komo
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "16.0"
+  generateEmptyDirectories: true
+
+targets:
+  komo:
+    type: application
+    platform: macOS
+    sources:
+      - komo
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.komo.browser
+        PRODUCT_NAME: komo
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: 1
+        SWIFT_VERSION: "5.9"
+        MACOSX_DEPLOYMENT_TARGET: "14.0"
+        CODE_SIGN_ENTITLEMENTS: komo/komo.entitlements
+        INFOPLIST_KEY_LSApplicationCategoryType: "public.app-category.productivity"
+        INFOPLIST_KEY_CFBundleDisplayName: komo
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

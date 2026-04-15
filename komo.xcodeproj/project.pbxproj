@@ -1,0 +1,369 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		01C2595389E66701286AB68F /* BrowserCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7365371A90F404572CF751E3 /* BrowserCommands.swift */; };
+		0BDB9B57C8756BEDB9559AB2 /* WebViewContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C73AA58455A4B4F2CDC57E8A /* WebViewContainer.swift */; };
+		52120E2A32288EAF2E625392 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D240B1C8FF57C62FC70EF620 /* SidebarView.swift */; };
+		6116DAC8C8BCF69EC84F69E8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 137CC69534F12FB02C0C9A59 /* Assets.xcassets */; };
+		947B0E0D3530F9D3F2BC32C4 /* URLBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D4DC08ECF1740E3DD904990 /* URLBar.swift */; };
+		A92675BBCAF5B985EB445998 /* komoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55996CA30E4EDD9BE9F2C51A /* komoApp.swift */; };
+		D0039E5B79E45D33738F6141 /* Tab.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3B2D83EE134DE806581A17E /* Tab.swift */; };
+		DEC3A2EC2E5FFCF9E38EC896 /* BrowserWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5C28937579003DEE213E123 /* BrowserWindow.swift */; };
+		EF2F6498C04F58C360D81CDC /* TabManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F6F3D022DC0CDEBE7CBD493 /* TabManager.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		137CC69534F12FB02C0C9A59 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		55996CA30E4EDD9BE9F2C51A /* komoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = komoApp.swift; sourceTree = "<group>"; };
+		6D4DC08ECF1740E3DD904990 /* URLBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = URLBar.swift; sourceTree = "<group>"; };
+		7365371A90F404572CF751E3 /* BrowserCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserCommands.swift; sourceTree = "<group>"; };
+		7F6F3D022DC0CDEBE7CBD493 /* TabManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabManager.swift; sourceTree = "<group>"; };
+		844939B7717B9F055126A3A2 /* komo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = komo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A27299332158B9844D9D0386 /* komo.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = komo.entitlements; sourceTree = "<group>"; };
+		B3B2D83EE134DE806581A17E /* Tab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tab.swift; sourceTree = "<group>"; };
+		C73AA58455A4B4F2CDC57E8A /* WebViewContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewContainer.swift; sourceTree = "<group>"; };
+		D240B1C8FF57C62FC70EF620 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
+		D5C28937579003DEE213E123 /* BrowserWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserWindow.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		11B78998081533AC457476B8 /* komo */ = {
+			isa = PBXGroup;
+			children = (
+				137CC69534F12FB02C0C9A59 /* Assets.xcassets */,
+				A27299332158B9844D9D0386 /* komo.entitlements */,
+				55996CA30E4EDD9BE9F2C51A /* komoApp.swift */,
+				5C2408E0FA73C797EA357076 /* ContentBlocker */,
+				D8F01D0724E8105FA86F0227 /* Models */,
+				A14E2CCC191612F8EE3DB0E0 /* Views */,
+				967258C6B71A95D594EC553F /* WebEngine */,
+			);
+			path = komo;
+			sourceTree = "<group>";
+		};
+		2AD375377B4233C492E6B56C /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				844939B7717B9F055126A3A2 /* komo.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		2C3CD69B70C6E377D210CA3E = {
+			isa = PBXGroup;
+			children = (
+				11B78998081533AC457476B8 /* komo */,
+				2AD375377B4233C492E6B56C /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		5C2408E0FA73C797EA357076 /* ContentBlocker */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = ContentBlocker;
+			sourceTree = "<group>";
+		};
+		967258C6B71A95D594EC553F /* WebEngine */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = WebEngine;
+			sourceTree = "<group>";
+		};
+		A14E2CCC191612F8EE3DB0E0 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				7365371A90F404572CF751E3 /* BrowserCommands.swift */,
+				D5C28937579003DEE213E123 /* BrowserWindow.swift */,
+				D240B1C8FF57C62FC70EF620 /* SidebarView.swift */,
+				6D4DC08ECF1740E3DD904990 /* URLBar.swift */,
+				C73AA58455A4B4F2CDC57E8A /* WebViewContainer.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		D8F01D0724E8105FA86F0227 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				B3B2D83EE134DE806581A17E /* Tab.swift */,
+				7F6F3D022DC0CDEBE7CBD493 /* TabManager.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		3BCD574E30F0643EB6DBDB32 /* komo */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 14B9D9E5AA2B31637A8A5753 /* Build configuration list for PBXNativeTarget "komo" */;
+			buildPhases = (
+				B35A60B33EA640FF03D3D9E4 /* Sources */,
+				C8F8FE5E4079E12B74904488 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = komo;
+			packageProductDependencies = (
+			);
+			productName = komo;
+			productReference = 844939B7717B9F055126A3A2 /* komo.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A2D717833FD75A94D4BB5179 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = 4C45A60F02EF27271D8C9142 /* Build configuration list for PBXProject "komo" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 2C3CD69B70C6E377D210CA3E;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 2AD375377B4233C492E6B56C /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				3BCD574E30F0643EB6DBDB32 /* komo */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		C8F8FE5E4079E12B74904488 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6116DAC8C8BCF69EC84F69E8 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		B35A60B33EA640FF03D3D9E4 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				01C2595389E66701286AB68F /* BrowserCommands.swift in Sources */,
+				DEC3A2EC2E5FFCF9E38EC896 /* BrowserWindow.swift in Sources */,
+				52120E2A32288EAF2E625392 /* SidebarView.swift in Sources */,
+				D0039E5B79E45D33738F6141 /* Tab.swift in Sources */,
+				EF2F6498C04F58C360D81CDC /* TabManager.swift in Sources */,
+				947B0E0D3530F9D3F2BC32C4 /* URLBar.swift in Sources */,
+				0BDB9B57C8756BEDB9559AB2 /* WebViewContainer.swift in Sources */,
+				A92675BBCAF5B985EB445998 /* komoApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		073FFDFFE9FD3CE72FD63F40 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		61BFEAE3EB6C9066071EF4F1 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = komo/komo.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				INFOPLIST_KEY_CFBundleDisplayName = komo;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.komo.browser;
+				PRODUCT_NAME = komo;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
+		A41C841889007FC72D24584B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		F8BA6DDB6E11FDAD90060116 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = komo/komo.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				INFOPLIST_KEY_CFBundleDisplayName = komo;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.komo.browser;
+				PRODUCT_NAME = komo;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		14B9D9E5AA2B31637A8A5753 /* Build configuration list for PBXNativeTarget "komo" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F8BA6DDB6E11FDAD90060116 /* Debug */,
+				61BFEAE3EB6C9066071EF4F1 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		4C45A60F02EF27271D8C9142 /* Build configuration list for PBXProject "komo" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A41C841889007FC72D24584B /* Debug */,
+				073FFDFFE9FD3CE72FD63F40 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = A2D717833FD75A94D4BB5179 /* Project object */;
+}
