@@ -15,20 +15,37 @@ body {
 }
 
 :root {
-  --bg: #1a1a1a;
-  --bg-hover: #252525;
+  --bg: #f5f5f5;
+  --bg-hover: #e8e8e8;
   --bg-selected: rgba(147, 112, 219, 0.12);
-  --bg-surface: #222;
-  --border: #333;
-  --text: #e0e0e0;
-  --text-secondary: #888;
-  --text-tertiary: #555;
-  --accent: #9370db;
-  --accent-dim: rgba(147, 112, 219, 0.2);
-  --star: #f0c040;
-  --danger: #e55;
+  --bg-surface: #fff;
+  --border: #ddd;
+  --text: #1a1a1a;
+  --text-secondary: #666;
+  --text-tertiary: #999;
+  --accent: #e8729a;
+  --accent-dim: rgba(232, 114, 154, 0.15);
+  --star: #e6a817;
+  --danger: #d44;
   --radius: 8px;
   --radius-sm: 6px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1a1a1a;
+    --bg-hover: #252525;
+    --bg-selected: rgba(147, 112, 219, 0.12);
+    --bg-surface: #222;
+    --border: #333;
+    --text: #e0e0e0;
+    --text-secondary: #888;
+    --text-tertiary: #555;
+    --accent: #e8729a;
+    --accent-dim: rgba(232, 114, 154, 0.2);
+    --star: #f0c040;
+    --danger: #e55;
+  }
 }
 
 /* Sidebar layout */
