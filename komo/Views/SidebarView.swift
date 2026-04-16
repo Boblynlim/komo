@@ -84,6 +84,19 @@ struct SidebarView: View {
 
                 Spacer()
 
+                // Pulse icon
+                Button(action: {
+                    NotificationCenter.default.post(name: .togglePulse, object: nil)
+                }) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 12, weight: .medium))
+                        .frame(width: 28, height: 28)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(Color.kPink)
+                .help("Pulse — Discover new stuff (⌘⇧P)")
+
                 // New folder icon — bottom right
                 Button(action: { isCreatingFolder = true }) {
                     Image(systemName: "folder.badge.plus")
@@ -303,7 +316,7 @@ struct FolderSection: View {
                     .background(.quaternary, in: Capsule())
             }
             .padding(.vertical, 2)
-            .background(isTargeted ? Color.accentColor.opacity(0.15) : Color.clear, in: RoundedRectangle(cornerRadius: 4))
+            .background(isTargeted ? Color.kPink.opacity(0.15) : Color.clear, in: RoundedRectangle(cornerRadius: 4))
             .dropDestination(for: TabTransfer.self) { items, _ in
                 for item in items {
                     if let uuid = UUID(uuidString: item.tabID),
@@ -385,6 +398,10 @@ struct SidebarTabRow: View {
             withAnimation(.easeInOut(duration: 0.15)) {
                 isHovering = hovering
             }
+        }
+        .onTapGesture {
+            tabManager.selectedTabID = tab.id
+            NotificationCenter.default.post(name: .dismissOverlays, object: nil)
         }
     }
 }

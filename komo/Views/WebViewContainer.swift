@@ -4,6 +4,7 @@ import WebKit
 struct WebViewContainer: NSViewRepresentable {
     @ObservedObject var tab: Tab
     @EnvironmentObject var downloadManager: DownloadManager
+    @EnvironmentObject var tabManager: TabManager
 
     func makeNSView(context: Context) -> NSView {
         let container = NSView()
@@ -20,6 +21,7 @@ struct WebViewContainer: NSViewRepresentable {
         ])
         context.coordinator.currentTabID = tab.id
         context.coordinator.downloadManager = downloadManager
+        context.coordinator.tabManager = tabManager
         return container
     }
 
@@ -27,6 +29,7 @@ struct WebViewContainer: NSViewRepresentable {
         guard context.coordinator.currentTabID != tab.id else { return }
         context.coordinator.currentTabID = tab.id
         context.coordinator.downloadManager = downloadManager
+        context.coordinator.tabManager = tabManager
 
         container.subviews.forEach { $0.removeFromSuperview() }
 
@@ -51,6 +54,7 @@ struct WebViewContainer: NSViewRepresentable {
         var tab: Tab
         var currentTabID: UUID?
         var downloadManager: DownloadManager?
+        weak var tabManager: TabManager?
 
         init(tab: Tab) {
             self.tab = tab
@@ -59,15 +63,17 @@ struct WebViewContainer: NSViewRepresentable {
         // MARK: - WKNavigationDelegate
 
         func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction) async -> WKNavigationActionPolicy {
-            if let url = navigationAction.request.url,
-               url.scheme == "http",
-               var components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
-                components.scheme = "https"
-                if let httpsURL = components.url {
-                    DispatchQueue.main.async {
-                        webView.load(URLRequest(url: httpsURL))
+            if let url = navigationAction.request.url {
+                // Upgrade HTTP to HTTPS
+                if url.scheme == "http",
+                   var components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+                    components.scheme = "https"
+                    if let httpsURL = components.url {
+                        await MainActor.run {
+                            webView.load(URLRequest(url: httpsURL))
+                        }
+                        return .cancel
                     }
-                    return .cancel
                 }
             }
             return .allow

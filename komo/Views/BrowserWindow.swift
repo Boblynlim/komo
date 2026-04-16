@@ -6,6 +6,7 @@ struct BrowserWindow: View {
     @State private var showSavePanel = false
     @State private var showLinkLibrary = false
     @State private var showCommandBar = false
+    @State private var showPulse = false
 
     var body: some View {
         NavigationSplitView(columnVisibility: .init(
@@ -15,7 +16,10 @@ struct BrowserWindow: View {
             SidebarView()
                 .navigationSplitViewColumnWidth(min: 140, ideal: 180, max: 280)
         } detail: {
-            if showLinkLibrary {
+            if showPulse {
+                PulseView()
+                    .toolbar { browserToolbar }
+            } else if showLinkLibrary {
                 LinkLibraryView()
                     .toolbar { browserToolbar }
             } else {
@@ -50,6 +54,7 @@ struct BrowserWindow: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .toggleLinkLibrary)) { _ in
             showLinkLibrary.toggle()
+            if showLinkLibrary { showPulse = false }
         }
         .overlay(alignment: .bottomTrailing) {
             DownloadPopupCard()
@@ -70,6 +75,14 @@ struct BrowserWindow: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .toggleCommandBar)) { _ in
             showCommandBar.toggle()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .togglePulse)) { _ in
+            showPulse.toggle()
+            if showPulse { showLinkLibrary = false }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .dismissOverlays)) { _ in
+            showPulse = false
+            showLinkLibrary = false
         }
     }
 

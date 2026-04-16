@@ -4,288 +4,294 @@ struct PulseView: View {
     @EnvironmentObject var pulseEngine: PulseEngine
     @EnvironmentObject var linkStore: LinkStore
     @EnvironmentObject var tabManager: TabManager
-    @State private var showAPIKeyInput = false
-    @State private var apiKeyInput = ""
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 24) {
-                // Header
-                header
-                    .padding(.top, 40)
+            VStack(alignment: .leading, spacing: 0) {
+                // Masthead
+                masthead
+                    .padding(.top, 48)
+                    .padding(.bottom, 32)
 
-                if !pulseEngine.hasAPIKey {
-                    apiKeyPrompt
-                } else if pulseEngine.isLoading {
+                if pulseEngine.isLoading {
                     loadingState
                 } else if pulseEngine.activeRecommendations.isEmpty {
                     emptyState
                 } else {
-                    // Recommendation cards
-                    LazyVGrid(columns: [
-                        GridItem(.flexible(), spacing: 16),
-                        GridItem(.flexible(), spacing: 16)
-                    ], spacing: 16) {
-                        ForEach(pulseEngine.activeRecommendations) { rec in
-                            PulseCard(recommendation: rec)
+                    // Newsletter sections by category
+                    ForEach(Array(pulseEngine.categories.enumerated()), id: \.element) { index, category in
+                        if index > 0 {
+                            sectionDivider
                         }
+                        categorySection(category)
                     }
-                    .padding(.horizontal, 32)
                 }
 
                 if let error = pulseEngine.error {
                     Text(error)
                         .font(.system(size: 12))
                         .foregroundStyle(.red)
+                        .frame(maxWidth: .infinity)
                         .padding()
                 }
 
-                Spacer(minLength: 40)
+                // Footer
+                footer
+                    .padding(.top, 40)
+                    .padding(.bottom, 48)
             }
+            .frame(maxWidth: 600)
+            .frame(maxWidth: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.windowBackgroundColor))
     }
 
-    var header: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 8) {
-                Text("Pulse")
-                    .font(.system(size: 28, weight: .light, design: .rounded))
+    // MARK: - Masthead
 
-                if pulseEngine.isLoading {
-                    ProgressView()
-                        .scaleEffect(0.5)
-                }
-            }
+    var masthead: some View {
+        VStack(spacing: 6) {
+            Text("PULSE")
+                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                .foregroundStyle(Color.kPink)
+                .tracking(4)
+
+            Text("Your Weekly Digest")
+                .font(.system(size: 28, weight: .light, design: .serif))
+                .foregroundStyle(.primary)
 
             if let lastRefreshed = pulseEngine.lastRefreshed {
-                Text("Updated \(lastRefreshed.formatted(.relative(presentation: .named)))")
-                    .font(.system(size: 11))
+                Text(lastRefreshed.formatted(.dateTime.weekday(.wide).month(.wide).day()))
+                    .font(.system(size: 12, weight: .regular))
                     .foregroundStyle(.tertiary)
+                    .padding(.top, 2)
             }
 
-            HStack(spacing: 12) {
-                Button(action: refreshPulse) {
+            // Thin rule under masthead
+            Rectangle()
+                .fill(.quaternary)
+                .frame(height: 1)
+                .padding(.top, 16)
+                .padding(.horizontal, 32)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    // MARK: - Category Section
+
+    func categorySection(_ category: String) -> some View {
+        let recs = pulseEngine.recommendations(for: category)
+        return VStack(alignment: .leading, spacing: 16) {
+            // Section header
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(category.uppercased())
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundStyle(Color.kPink)
+                    .tracking(2)
+
+                Rectangle()
+                    .fill(.quaternary)
+                    .frame(height: 1)
+            }
+            .padding(.horizontal, 32)
+
+            // Items
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(recs.enumerated()), id: \.element.id) { index, rec in
+                    if index > 0 {
+                        Rectangle()
+                            .fill(.quaternary.opacity(0.5))
+                            .frame(height: 1)
+                            .padding(.horizontal, 32)
+                    }
+                    PulseRow(recommendation: rec)
+                }
+            }
+        }
+        .padding(.vertical, 20)
+    }
+
+    var sectionDivider: some View {
+        HStack(spacing: 12) {
+            Rectangle().fill(.quaternary).frame(height: 1)
+            Image(systemName: "diamond.fill")
+                .font(.system(size: 4))
+                .foregroundStyle(.quaternary)
+            Rectangle().fill(.quaternary).frame(height: 1)
+        }
+        .padding(.horizontal, 48)
+    }
+
+    // MARK: - States
+
+    var loadingState: some View {
+        VStack(spacing: 12) {
+            ProgressView()
+            Text("Curating this week's picks...")
+                .font(.system(size: 13, design: .serif))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(60)
+    }
+
+    var emptyState: some View {
+        VStack(spacing: 12) {
+            Text("Nothing here yet")
+                .font(.system(size: 16, weight: .regular, design: .serif))
+                .foregroundStyle(.secondary)
+            Text("Save some links (⌘D) and Pulse will learn what to recommend.")
+                .font(.system(size: 13))
+                .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(60)
+    }
+
+    // MARK: - Footer
+
+    var footer: some View {
+        VStack(spacing: 8) {
+            Rectangle()
+                .fill(.quaternary)
+                .frame(height: 1)
+                .padding(.horizontal, 32)
+
+            HStack(spacing: 16) {
+                Button(action: {
+                    Task { await pulseEngine.refresh(links: linkStore.links) }
+                }) {
                     Label("Refresh", systemImage: "arrow.clockwise")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 11, weight: .medium))
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
                 .disabled(pulseEngine.isLoading)
 
-                Button(action: { showAPIKeyInput.toggle() }) {
-                    Image(systemName: "key")
-                        .font(.system(size: 11))
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.tertiary)
-                .popover(isPresented: $showAPIKeyInput) {
-                    VStack(spacing: 10) {
-                        Text("Claude API Key")
-                            .font(.system(size: 12, weight: .semibold))
-                        SecureField("sk-ant-...", text: $apiKeyInput)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 280)
-                            .onSubmit {
-                                pulseEngine.setAPIKey(apiKeyInput)
-                                showAPIKeyInput = false
-                            }
-                        Button("Save") {
-                            pulseEngine.setAPIKey(apiKeyInput)
-                            showAPIKeyInput = false
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.purple)
-                    }
-                    .padding(16)
-                }
-            }
-            .padding(.top, 4)
-        }
-    }
+                Text("·")
+                    .foregroundStyle(.quaternary)
 
-    var apiKeyPrompt: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 32))
-                .foregroundStyle(.purple.opacity(0.5))
-
-            Text("Pulse needs a Claude API key to find you cool stuff")
-                .font(.system(size: 13))
-                .foregroundStyle(.secondary)
-
-            SecureField("sk-ant-...", text: $apiKeyInput)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 300)
-                .onSubmit {
-                    pulseEngine.setAPIKey(apiKeyInput)
-                    refreshPulse()
-                }
-
-            Button("Connect") {
-                pulseEngine.setAPIKey(apiKeyInput)
-                refreshPulse()
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.purple)
-            .disabled(apiKeyInput.isEmpty)
-        }
-        .padding(40)
-    }
-
-    var loadingState: some View {
-        VStack(spacing: 12) {
-            ProgressView()
-            Text("Finding things you'd like...")
-                .font(.system(size: 13))
-                .foregroundStyle(.secondary)
-        }
-        .padding(40)
-    }
-
-    var emptyState: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 28))
-                .foregroundStyle(.quaternary)
-
-            if linkStore.links.isEmpty {
-                Text("Save some links first")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.secondary)
-                Text("Pulse learns from your saved links to recommend new stuff.\nPress \u{2318}D to save pages you like.")
-                    .font(.system(size: 11))
+                Text("Curated by Pulse for you")
+                    .font(.system(size: 11, design: .serif))
                     .foregroundStyle(.tertiary)
-                    .multilineTextAlignment(.center)
-            } else {
-                Text("Ready to discover")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.secondary)
-
-                Button("Generate Recommendations") {
-                    refreshPulse()
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(.purple)
+                    .italic()
             }
-        }
-        .padding(40)
-    }
-
-    private func refreshPulse() {
-        Task {
-            await pulseEngine.refresh(links: linkStore.links)
+            .padding(.top, 8)
         }
     }
 }
 
-struct PulseCard: View {
+// MARK: - Row
+
+struct PulseRow: View {
     let recommendation: PulseRecommendation
     @EnvironmentObject var pulseEngine: PulseEngine
     @EnvironmentObject var tabManager: TabManager
     @EnvironmentObject var linkStore: LinkStore
     @State private var isHovering = false
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // Domain
-            HStack(spacing: 4) {
-                Image(systemName: "globe")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.tertiary)
-                Text(recommendation.domain)
-                    .font(.system(size: 10, weight: .medium, design: .monospaced))
-                    .foregroundStyle(.tertiary)
-                Spacer()
-            }
+    var isSaved: Bool {
+        linkStore.links.contains { $0.url == recommendation.url }
+    }
 
-            // Title
-            Text(recommendation.title)
-                .font(.system(size: 14, weight: .medium))
-                .lineLimit(2)
-                .foregroundStyle(.primary)
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            // Title as link
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(recommendation.title)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(.primary)
+
+                Text(recommendation.domain)
+                    .font(.system(size: 10, weight: .regular, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+            }
 
             // Description
             Text(recommendation.description)
-                .font(.system(size: 12))
+                .font(.system(size: 13, weight: .regular, design: .serif))
                 .foregroundStyle(.secondary)
-                .lineLimit(3)
+                .lineSpacing(3)
+                .fixedSize(horizontal: false, vertical: true)
 
-            // Reason
+            // Why — editorial note
             HStack(spacing: 4) {
                 Image(systemName: "sparkles")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.purple)
+                    .font(.system(size: 8))
                 Text(recommendation.reason)
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.purple.opacity(0.8))
-                    .lineLimit(1)
+                    .font(.system(size: 11, weight: .medium))
+                    .italic()
             }
+            .foregroundStyle(Color.kPink.opacity(0.7))
+            .padding(.top, 2)
 
-            // Tags
-            HStack(spacing: 4) {
-                ForEach(recommendation.tags.prefix(3), id: \.self) { tag in
-                    Text("#\(tag)")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
-                        .background(.quaternary, in: Capsule())
-                }
-                Spacer()
-            }
-
-            // Actions
-            if isHovering || recommendation.feedback == .liked {
-                HStack(spacing: 8) {
-                    Button(action: { openRecommendation() }) {
-                        Label("Open", systemImage: "arrow.up.right")
+            // Actions — always show feedback, show read/save on hover
+            HStack(spacing: 12) {
+                if isHovering {
+                    Button(action: openRecommendation) {
+                        Label("Read", systemImage: "arrow.up.right")
                             .font(.system(size: 10, weight: .medium))
+                            .padding(.vertical, 6)
+                            .padding(.horizontal, 4)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.blue)
 
-                    Button(action: { saveRecommendation() }) {
-                        Label("Save", systemImage: "bookmark")
+                    Button(action: saveRecommendation) {
+                        Label(isSaved ? "Saved" : "Save", systemImage: isSaved ? "bookmark.fill" : "bookmark")
                             .font(.system(size: 10, weight: .medium))
+                            .padding(.vertical, 6)
+                            .padding(.horizontal, 4)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(.purple)
-
-                    Spacer()
-
-                    Button(action: { pulseEngine.like(recommendation) }) {
-                        Image(systemName: recommendation.feedback == .liked ? "hand.thumbsup.fill" : "hand.thumbsup")
-                            .font(.system(size: 11))
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(recommendation.feedback == .liked ? .green : .secondary)
-
-                    Button(action: { pulseEngine.dismiss(recommendation) }) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 10))
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.kPink)
                 }
-                .transition(.opacity)
+
+                Spacer()
+
+                Button(action: { pulseEngine.like(recommendation) }) {
+                    Image(systemName: recommendation.feedback == .liked ? "hand.thumbsup.fill" : "hand.thumbsup")
+                        .font(.system(size: 11))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(recommendation.feedback == .liked ? Color.green : Color.secondary.opacity(0.3))
+
+                Button(action: { pulseEngine.dislike(recommendation) }) {
+                    Image(systemName: recommendation.feedback == .dismissed ? "hand.thumbsdown.fill" : "hand.thumbsdown")
+                        .font(.system(size: 11))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(recommendation.feedback == .dismissed ? Color.red.opacity(0.6) : Color.secondary.opacity(0.3))
+            }
+            .padding(.top, 4)
+        }
+        .padding(.horizontal, 32)
+        .padding(.vertical, 14)
+        .background(isHovering ? Color.primary.opacity(0.03) : .clear)
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isHovering = hovering
             }
         }
-        .padding(14)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(recommendation.feedback == .liked ? Color.green.opacity(0.3) : Color.clear, lineWidth: 1.5)
-        )
-        .shadow(color: .black.opacity(isHovering ? 0.1 : 0.04), radius: isHovering ? 8 : 4, y: 2)
-        .onHover { isHovering = $0 }
+        .simultaneousGesture(TapGesture().modifiers(.command).onEnded {
+            openInBackground()
+        })
         .onTapGesture { openRecommendation() }
     }
 
     private func openRecommendation() {
         if let url = URL(string: recommendation.url) {
             tabManager.createNewTab(url: url)
+            NotificationCenter.default.post(name: .togglePulse, object: nil)
+        }
+    }
+
+    private func openInBackground() {
+        if let url = URL(string: recommendation.url) {
+            tabManager.createNewTab(url: url, switchTo: false)
         }
     }
 

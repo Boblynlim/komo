@@ -5,9 +5,10 @@ struct PulseRecommendation: Identifiable, Codable {
     var title: String
     var url: String
     var description: String
-    var reason: String // why this was recommended
+    var reason: String
     var tags: [String]
     var domain: String
+    var category: String
     var feedback: Feedback?
 
     enum Feedback: String, Codable {
@@ -15,7 +16,7 @@ struct PulseRecommendation: Identifiable, Codable {
         case dismissed
     }
 
-    init(title: String, url: String, description: String, reason: String, tags: [String], domain: String) {
+    init(title: String, url: String, description: String, reason: String, tags: [String], domain: String, category: String) {
         self.id = UUID()
         self.title = title
         self.url = url
@@ -23,6 +24,7 @@ struct PulseRecommendation: Identifiable, Codable {
         self.reason = reason
         self.tags = tags
         self.domain = domain
+        self.category = category
     }
 }
 
@@ -33,7 +35,6 @@ class PulseEngine: ObservableObject {
     @Published var error: String? = nil
 
     private var apiKey: String {
-        // Check environment, then stored preference
         if let key = ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"], !key.isEmpty {
             return key
         }
@@ -57,6 +58,111 @@ class PulseEngine: ObservableObject {
 
     init() {
         loadCached()
+        if recommendations.isEmpty {
+            loadPlaceholders()
+        }
+    }
+
+    /// Categories in display order
+    var categories: [String] {
+        var seen: [String] = []
+        for rec in activeRecommendations {
+            if !seen.contains(rec.category) {
+                seen.append(rec.category)
+            }
+        }
+        return seen
+    }
+
+    func recommendations(for category: String) -> [PulseRecommendation] {
+        activeRecommendations.filter { $0.category == category }
+    }
+
+    private func loadPlaceholders() {
+        recommendations = [
+            // — Interactive & Visual
+            PulseRecommendation(
+                title: "Bartosz Ciechanowski",
+                url: "https://ciechanow.ski",
+                description: "Deep, beautifully animated explanations of how things work — GPS, cameras, mechanical watches. Each post takes months to craft and it shows.",
+                reason: "The gold standard for interactive technical writing",
+                tags: ["engineering", "interactive", "visualization"],
+                domain: "ciechanow.ski",
+                category: "Interactive & Visual"
+            ),
+            PulseRecommendation(
+                title: "Explorable Explanations",
+                url: "https://explorabl.es",
+                description: "A curated hub of interactive articles that teach through play — math, science, systems thinking, economics. Learning by doing.",
+                reason: "Interactive learning meets curiosity",
+                tags: ["interactive", "education", "math"],
+                domain: "explorabl.es",
+                category: "Interactive & Visual"
+            ),
+            PulseRecommendation(
+                title: "Neal.fun",
+                url: "https://neal.fun",
+                description: "Playful interactive experiments — the size of space, spend Bill Gates' money, the deep sea. Each one is a tiny, perfect rabbit hole.",
+                reason: "Delightful, shareable rabbit holes",
+                tags: ["interactive", "fun", "visualization"],
+                domain: "neal.fun",
+                category: "Interactive & Visual"
+            ),
+
+            // — Indie Web & Discovery
+            PulseRecommendation(
+                title: "Marginalia Search",
+                url: "https://search.marginalia.nu",
+                description: "A search engine that intentionally surfaces small, independent websites instead of SEO-optimized content farms. The anti-Google.",
+                reason: "Rediscover the weird, personal web",
+                tags: ["search", "indie-web", "discovery"],
+                domain: "search.marginalia.nu",
+                category: "Indie Web & Discovery"
+            ),
+            PulseRecommendation(
+                title: "Hundred Rabbits",
+                url: "https://100r.co",
+                description: "Two artists living on a sailboat, building open-source creative tools that run on minimal hardware. Software as a lifestyle philosophy.",
+                reason: "Indie software meets unconventional living",
+                tags: ["indie", "creative-tools", "open-source"],
+                domain: "100r.co",
+                category: "Indie Web & Discovery"
+            ),
+
+            // — Data & Storytelling
+            PulseRecommendation(
+                title: "The Pudding",
+                url: "https://pudding.cool",
+                description: "Visual essays on culture, language, music, and trends — each one is a small interactive masterpiece backed by real data.",
+                reason: "Data journalism with craft and taste",
+                tags: ["data-viz", "culture", "essays"],
+                domain: "pudding.cool",
+                category: "Data & Storytelling"
+            ),
+
+            // — Unconventional Tech
+            PulseRecommendation(
+                title: "Low Tech Magazine — Solar Powered",
+                url: "https://solar.lowtechmagazine.com",
+                description: "A solar-powered website about sustainable technology and forgotten innovations. When the sun doesn't shine, the site goes down. On purpose.",
+                reason: "Technology criticism that practices what it preaches",
+                tags: ["sustainability", "technology", "design"],
+                domain: "solar.lowtechmagazine.com",
+                category: "Unconventional Tech"
+            ),
+
+            // — CS & Learning
+            PulseRecommendation(
+                title: "Algorithms by Jeff Erickson",
+                url: "https://jeffe.cs.illinois.edu/teaching/algorithms/",
+                description: "A free, beautifully written algorithms textbook used at top CS programs. Clear prose, no hand-waving, excellent exercises.",
+                reason: "The algorithms textbook you wish you'd had",
+                tags: ["algorithms", "cs", "textbook"],
+                domain: "jeffe.cs.illinois.edu",
+                category: "CS & Learning"
+            ),
+        ]
+        lastRefreshed = .now
     }
 
     func refresh(links: [SavedLink]) async {
@@ -73,7 +179,6 @@ class PulseEngine: ObservableObject {
         let profile = TasteGraphBuilder.build(from: links)
         let profilePrompt = TasteGraphBuilder.formatForPrompt(profile, recentLinks: links)
 
-        // Build liked/dismissed history for better recs
         let likedTitles = recommendations.filter { $0.feedback == .liked }.map { $0.title }
         let dismissedTitles = recommendations.filter { $0.feedback == .dismissed }.map { $0.title }
 
@@ -82,7 +187,7 @@ class PulseEngine: ObservableObject {
         articles, tools, and rabbit holes based on the user's taste profile.
 
         Rules:
-        - Recommend 8 items
+        - Recommend 8-10 items grouped into 3-5 categories
         - Each item must be a real, existing website or article
         - Focus on discovering things they HAVEN'T seen, not popular mainstream sites
         - Match their interests but also surprise them with adjacent topics
@@ -97,7 +202,8 @@ class PulseEngine: ObservableObject {
                 "description": "One sentence about what this is",
                 "reason": "Why this matches their taste",
                 "tags": ["tag1", "tag2"],
-                "domain": "example.com"
+                "domain": "example.com",
+                "category": "Category Name"
             }
         ]
         """
@@ -117,7 +223,7 @@ class PulseEngine: ObservableObject {
             }
         }
 
-        userPrompt += "\n\nBased on this profile, recommend 8 interesting sites, articles, or tools I'd love. Return JSON only."
+        userPrompt += "\n\nBased on this profile, recommend 8-10 interesting sites grouped by category. Return JSON only."
 
         do {
             let recs = try await callClaude(system: systemPrompt, user: userPrompt)
@@ -137,20 +243,20 @@ class PulseEngine: ObservableObject {
 
     func like(_ rec: PulseRecommendation) {
         if let index = recommendations.firstIndex(where: { $0.id == rec.id }) {
-            recommendations[index].feedback = .liked
+            recommendations[index].feedback = (recommendations[index].feedback == .liked) ? nil : .liked
             persistCache()
         }
     }
 
-    func dismiss(_ rec: PulseRecommendation) {
+    func dislike(_ rec: PulseRecommendation) {
         if let index = recommendations.firstIndex(where: { $0.id == rec.id }) {
-            recommendations[index].feedback = .dismissed
+            recommendations[index].feedback = (recommendations[index].feedback == .dismissed) ? nil : .dismissed
             persistCache()
         }
     }
 
     var activeRecommendations: [PulseRecommendation] {
-        recommendations.filter { $0.feedback != .dismissed }
+        recommendations
     }
 
     // MARK: - Claude API
@@ -165,7 +271,7 @@ class PulseEngine: ObservableObject {
 
         let body: [String: Any] = [
             "model": "claude-haiku-4-5-20251001",
-            "max_tokens": 1024,
+            "max_tokens": 2048,
             "system": system,
             "messages": [
                 ["role": "user", "content": user]
@@ -181,14 +287,12 @@ class PulseEngine: ObservableObject {
             throw PulseError.apiError(errorText)
         }
 
-        // Parse Claude response
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
         guard let content = json?["content"] as? [[String: Any]],
               let text = content.first?["text"] as? String else {
             throw PulseError.parseError("No text in response")
         }
 
-        // Extract JSON from response (Claude might wrap it)
         let jsonText = extractJSON(from: text)
         let recData = jsonText.data(using: .utf8)!
         let decoded = try JSONDecoder().decode([PulseRecommendation].self, from: recData)
@@ -196,7 +300,6 @@ class PulseEngine: ObservableObject {
     }
 
     private func extractJSON(from text: String) -> String {
-        // Try to find JSON array in the response
         if let start = text.firstIndex(of: "["),
            let end = text.lastIndex(of: "]") {
             return String(text[start...end])

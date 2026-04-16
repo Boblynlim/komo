@@ -44,20 +44,20 @@ struct CommandBar: View {
                 if let folder = activeFolder {
                     Text(folder.name)
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.purple)
+                        .foregroundStyle(.kPink)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(.purple.opacity(0.1), in: Capsule())
+                        .background(.kPink.opacity(0.1), in: Capsule())
                     Text("/")
                         .font(.system(size: 12))
                         .foregroundStyle(.quaternary)
                 } else if let tag = activeLinkTag {
                     Text("#\(tag)")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.purple)
+                        .foregroundStyle(.kPink)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(.purple.opacity(0.1), in: Capsule())
+                        .background(.kPink.opacity(0.1), in: Capsule())
                     Text("/")
                         .font(.system(size: 12))
                         .foregroundStyle(.quaternary)
@@ -360,7 +360,7 @@ struct CommandResultRow: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(isSelected ? Color.purple.opacity(0.12) : .clear, in: RoundedRectangle(cornerRadius: 8))
+        .background(isSelected ? Color.kPink.opacity(0.12) : .clear, in: RoundedRectangle(cornerRadius: 8))
         .padding(.horizontal, 6)
         .padding(.vertical, 1)
         .contentShape(Rectangle())
@@ -379,7 +379,7 @@ struct CommandResultRow: View {
     private var iconColor: Color {
         switch result {
         case .folder: return .blue
-        case .linkTag: return .purple
+        case .linkTag: return .kPink
         default: return .secondary
         }
     }

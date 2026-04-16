@@ -1,5 +1,14 @@
 import SwiftUI
 
+extension Color {
+    // #E866D4
+    static let kPink = Color(red: 0.91, green: 0.40, blue: 0.83)
+}
+
+extension ShapeStyle where Self == Color {
+    static var kPink: Color { .kPink }
+}
+
 @main
 struct komoApp: App {
     @StateObject private var tabManager = TabManager()

@@ -54,7 +54,7 @@ class TabManager: ObservableObject {
             }
     }
 
-    func createNewTab(url: URL? = nil, isPinned: Bool = false) {
+    func createNewTab(url: URL? = nil, isPinned: Bool = false, switchTo: Bool = true) {
         // No URL = just open command bar, don't create an empty tab
         if url == nil {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -75,7 +75,7 @@ class TabManager: ObservableObject {
         setupObservers(for: tab)
 
         tabs.append(tab)
-        selectedTabID = tab.id
+        if switchTo { selectedTabID = tab.id }
         tab.load(url!)
     }
 
