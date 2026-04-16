@@ -5,6 +5,12 @@ let activeTabId = null;
 let commandBarSelectedIndex = 0;
 let commandBarResults = [];
 let contextMenu = null;
+let currentView = 'tabs'; // 'tabs' | 'scout' | 'library'
+let scoutFeedback = {}; // { itemId: 'liked' | 'disliked' }
+let libraryFilter = 'inbox'; // 'inbox' | 'archive' | 'tag'
+let libraryTagFilter = null;
+let librarySearchQuery = '';
+let activeTagPopover = null;
 
 // --- Init ---
 async function init() {
@@ -13,13 +19,15 @@ async function init() {
   render();
 
   // Listen for tab changes
-  chrome.tabs.onUpdated.addListener(() => render());
-  chrome.tabs.onRemoved.addListener(() => render());
+  const onTabChange = () => { render(); refreshCommandBarIfOpen(); };
+  chrome.tabs.onUpdated.addListener(onTabChange);
+  chrome.tabs.onRemoved.addListener(onTabChange);
   chrome.tabs.onActivated.addListener((info) => {
     activeTabId = info.tabId;
-    render();
+    onTabChange();
   });
-  chrome.tabs.onMoved.addListener(() => render());
+  chrome.tabs.onMoved.addListener(onTabChange);
+  chrome.tabs.onCreated.addListener(onTabChange);
 
   // Get current active tab
   const active = await tabManager.getActiveTab();
@@ -33,7 +41,7 @@ async function init() {
 
   // Keyboard shortcut in sidebar
   document.addEventListener('keydown', (e) => {
-    if (e.metaKey && e.key === 'k') { e.preventDefault(); toggleCommandBar(); }
+    if (e.metaKey && (e.key === 'k' || e.key === 't')) { e.preventDefault(); toggleCommandBar(); }
     if (e.metaKey && e.key === 'd') { e.preventDefault(); openSaveLinkPanel(); }
   });
 
@@ -54,6 +62,16 @@ async function init() {
       render();
     }
   });
+
+  // Scout toggle
+  document.getElementById('scout-btn').addEventListener('click', () => toggleView('scout'));
+
+  // Library toggle
+  document.getElementById('library-btn').addEventListener('click', () => toggleView('library'));
+
+  // Load scout feedback from storage
+  const fbData = await chrome.storage.local.get('scoutFeedback');
+  scoutFeedback = fbData.scoutFeedback || {};
 
   render();
 }
@@ -172,18 +190,32 @@ function createTabRow(tab) {
 }
 
 // --- Command Bar ---
+function refreshCommandBarIfOpen() {
+  const overlay = document.getElementById('command-bar-overlay');
+  if (!overlay.classList.contains('hidden')) updateCommandBarResults();
+}
+
 function toggleCommandBar() {
   const overlay = document.getElementById('command-bar-overlay');
+  const input = document.getElementById('command-bar-input');
+  const isOpening = overlay.classList.contains('hidden');
   overlay.classList.toggle('hidden');
-  if (!overlay.classList.contains('hidden')) {
-    const input = document.getElementById('command-bar-input');
+  if (isOpening) {
     input.value = '';
     input.focus();
     commandBarSelectedIndex = 0;
     updateCommandBarResults();
-    input.addEventListener('input', updateCommandBarResults);
-    input.addEventListener('keydown', handleCommandBarKeys);
+    input.addEventListener('input', onCommandBarInput);
+    overlay.addEventListener('keydown', handleCommandBarKeys);
+  } else {
+    input.removeEventListener('input', onCommandBarInput);
+    overlay.removeEventListener('keydown', handleCommandBarKeys);
   }
+}
+
+function onCommandBarInput() {
+  commandBarSelectedIndex = 0;
+  updateCommandBarResults();
 }
 
 async function updateCommandBarResults() {
@@ -282,11 +314,11 @@ function handleCommandBarKeys(e) {
   if (e.key === 'ArrowDown') {
     e.preventDefault();
     commandBarSelectedIndex = Math.min(commandBarResults.length - 1, commandBarSelectedIndex + 1);
-    updateCommandBarResults();
+    updateCommandBarSelection();
   } else if (e.key === 'ArrowUp') {
     e.preventDefault();
     commandBarSelectedIndex = Math.max(0, commandBarSelectedIndex - 1);
-    updateCommandBarResults();
+    updateCommandBarSelection();
   } else if (e.key === 'Enter') {
     e.preventDefault();
     executeCommandBarResult(commandBarSelectedIndex);
@@ -294,6 +326,15 @@ function handleCommandBarKeys(e) {
     e.preventDefault();
     toggleCommandBar();
   }
+}
+
+function updateCommandBarSelection() {
+  const resultsDiv = document.getElementById('command-bar-results');
+  resultsDiv.querySelectorAll('.result-row').forEach(row => {
+    row.classList.toggle('selected', parseInt(row.dataset.index) === commandBarSelectedIndex);
+  });
+  const selected = resultsDiv.querySelector('.result-row.selected');
+  if (selected) selected.scrollIntoView({ block: 'nearest' });
 }
 
 function executeCommandBarResult(index) {
@@ -491,6 +532,467 @@ document.addEventListener('drop', (e) => {
     }
   }
 });
+
+// --- View Switching ---
+function toggleView(view) {
+  if (currentView === view) {
+    currentView = 'tabs';
+  } else {
+    currentView = view;
+  }
+  applyView();
+}
+
+function applyView() {
+  const tabsView = document.getElementById('tabs-view');
+  const scoutView = document.getElementById('scout-view');
+  const libraryView = document.getElementById('library-view');
+  const scoutBtn = document.getElementById('scout-btn');
+  const libraryBtn = document.getElementById('library-btn');
+
+  tabsView.classList.toggle('hidden', currentView !== 'tabs');
+  scoutView.classList.toggle('hidden', currentView !== 'scout');
+  libraryView.classList.toggle('hidden', currentView !== 'library');
+
+  scoutBtn.classList.toggle('active', currentView === 'scout');
+  libraryBtn.classList.toggle('active', currentView === 'library');
+
+  if (currentView === 'scout') renderScout();
+  if (currentView === 'library') renderLibrary();
+}
+
+// --- Scout ---
+const SCOUT_ITEMS = [
+  {
+    id: 's1', title: 'Bartosz Ciechanowski', url: 'https://ciechanow.ski',
+    domain: 'ciechanow.ski', category: 'Interactive & Visual',
+    description: 'Deep, beautifully animated explanations of how things work — GPS, cameras, mechanical watches. Each post takes months to craft and it shows.',
+    reason: 'The gold standard for interactive technical writing'
+  },
+  {
+    id: 's2', title: 'Explorable Explanations', url: 'https://explorabl.es',
+    domain: 'explorabl.es', category: 'Interactive & Visual',
+    description: 'A curated hub of interactive articles that teach through play — math, science, systems thinking, economics. Learning by doing.',
+    reason: 'Interactive learning meets curiosity'
+  },
+  {
+    id: 's3', title: 'Neal.fun', url: 'https://neal.fun',
+    domain: 'neal.fun', category: 'Interactive & Visual',
+    description: 'Playful interactive experiments — the size of space, spend Bill Gates\' money, the deep sea. Each one is a tiny, perfect rabbit hole.',
+    reason: 'Delightful, shareable rabbit holes'
+  },
+  {
+    id: 's4', title: 'Marginalia Search', url: 'https://search.marginalia.nu',
+    domain: 'search.marginalia.nu', category: 'Indie Web & Discovery',
+    description: 'A search engine that intentionally surfaces small, independent websites instead of SEO-optimized content farms. The anti-Google.',
+    reason: 'Rediscover the weird, personal web'
+  },
+  {
+    id: 's5', title: 'Hundred Rabbits', url: 'https://100r.co',
+    domain: '100r.co', category: 'Indie Web & Discovery',
+    description: 'Two artists living on a sailboat, building open-source creative tools that run on minimal hardware. Software as a lifestyle philosophy.',
+    reason: 'Indie software meets unconventional living'
+  },
+  {
+    id: 's6', title: 'The Pudding', url: 'https://pudding.cool',
+    domain: 'pudding.cool', category: 'Data & Storytelling',
+    description: 'Visual essays on culture, language, music, and trends — each one is a small interactive masterpiece backed by real data.',
+    reason: 'Data journalism with craft and taste'
+  },
+  {
+    id: 's7', title: 'Low Tech Magazine', url: 'https://solar.lowtechmagazine.com',
+    domain: 'solar.lowtechmagazine.com', category: 'Unconventional Tech',
+    description: 'A solar-powered website about sustainable technology and forgotten innovations. When the sun doesn\'t shine, the site goes down. On purpose.',
+    reason: 'Technology criticism that practices what it preaches'
+  },
+  {
+    id: 's8', title: 'Algorithms by Jeff Erickson', url: 'https://jeffe.cs.illinois.edu/teaching/algorithms/',
+    domain: 'jeffe.cs.illinois.edu', category: 'CS & Learning',
+    description: 'A free, beautifully written algorithms textbook used at top CS programs. Clear prose, no hand-waving, excellent exercises.',
+    reason: 'The algorithms textbook you wish you\'d had'
+  }
+];
+
+function getScoutCategories() {
+  const seen = [];
+  SCOUT_ITEMS.forEach(item => {
+    if (!seen.includes(item.category)) seen.push(item.category);
+  });
+  return seen;
+}
+
+function renderScout() {
+  const container = document.getElementById('scout-content');
+  const categories = getScoutCategories();
+  const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+
+  // Build pixel divider (40 segments, alternating)
+  let pixelDivider = '';
+  for (let i = 0; i < 40; i++) {
+    pixelDivider += `<span class="px ${i % 2 === 0 ? 'on' : ''}"></span>`;
+  }
+
+  let html = `
+    <div class="scout-masthead">
+      <div class="scout-dots">
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      </div>
+      <div class="scout-title">SCOUT</div>
+      <div class="scout-pixel-divider">${pixelDivider}</div>
+      <div class="scout-date">${today}</div>
+    </div>
+  `;
+
+  categories.forEach((cat, catIdx) => {
+    if (catIdx > 0) {
+      // Section divider
+      let divPx = '';
+      for (let i = 0; i < 60; i++) divPx += `<span class="px ${i % 3 === 0 ? 'on' : ''}"></span>`;
+      html += `<div class="scout-section-divider">${divPx}</div>`;
+    }
+
+    const items = SCOUT_ITEMS.filter(it => it.category === cat);
+
+    // Category header dots
+    let dots = '';
+    for (let i = 0; i < 30; i++) dots += '<span class="d"></span>';
+
+    html += `<div class="scout-category">`;
+    html += `<div class="scout-category-header">
+      <span class="block"></span>
+      <span class="label">${escapeHtml(cat)}</span>
+      <div class="dots">${dots}</div>
+    </div>`;
+
+    items.forEach((item, idx) => {
+      if (idx > 0) {
+        let sep = '';
+        for (let i = 0; i < 20; i++) sep += '<span class="d"></span>';
+        html += `<div class="scout-item-sep">${sep}</div>`;
+      }
+
+      const fb = scoutFeedback[item.id];
+      const isSaved = linkStore.isSaved(item.url);
+
+      html += `
+        <div class="scout-item" data-scout-id="${item.id}" data-url="${escapeHtml(item.url)}">
+          <div class="scout-item-title-row">
+            <span class="scout-item-title">${escapeHtml(item.title)}</span>
+            <span class="scout-item-domain">${escapeHtml(item.domain)}</span>
+          </div>
+          <div class="scout-item-desc">${escapeHtml(item.description)}</div>
+          <div class="scout-item-reason">
+            <span class="px"></span>
+            <span class="reason-text">${escapeHtml(item.reason)}</span>
+          </div>
+          <div class="scout-item-actions">
+            <div class="hover-actions">
+              <button class="scout-action-btn open-btn" data-action="open" data-url="${escapeHtml(item.url)}">&#8599; open</button>
+              <button class="scout-action-btn ${isSaved ? 'saved-btn' : 'save-btn'}" data-action="save" data-url="${escapeHtml(item.url)}" data-title="${escapeHtml(item.title)}">${isSaved ? '&#9733; saved' : '&#9734; save'}</button>
+            </div>
+            <span class="spacer"></span>
+            <button class="scout-thumb-btn ${fb === 'liked' ? 'liked' : ''}" data-action="like" data-id="${item.id}">&#128077;</button>
+            <button class="scout-thumb-btn ${fb === 'disliked' ? 'disliked' : ''}" data-action="dislike" data-id="${item.id}">&#128078;</button>
+          </div>
+        </div>
+      `;
+    });
+
+    html += `</div>`;
+  });
+
+  // Footer
+  let footerDivider = '';
+  for (let i = 0; i < 40; i++) footerDivider += `<span class="px ${i % 2 === 0 ? 'on' : ''}"></span>`;
+
+  html += `
+    <div class="scout-footer">
+      <div class="scout-pixel-divider">${footerDivider}</div>
+      <div class="scout-footer-row">
+        <button class="scout-footer-btn" id="scout-refresh-btn">&#8635; refresh</button>
+        <span class="scout-footer-sep">//</span>
+        <span class="scout-footer-label">scouted for you</span>
+      </div>
+    </div>
+  `;
+
+  container.innerHTML = html;
+
+  // Wire up events
+  container.querySelectorAll('.scout-item').forEach(row => {
+    row.addEventListener('click', (e) => {
+      if (e.target.closest('button')) return;
+      chrome.tabs.create({ url: row.dataset.url });
+    });
+  });
+
+  container.querySelectorAll('.scout-action-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (btn.dataset.action === 'open') {
+        chrome.tabs.create({ url: btn.dataset.url });
+      } else if (btn.dataset.action === 'save') {
+        await linkStore.save(btn.dataset.url, btn.dataset.title);
+        renderScout();
+      }
+    });
+  });
+
+  container.querySelectorAll('.scout-thumb-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.id;
+      const action = btn.dataset.action;
+      if (action === 'like') {
+        scoutFeedback[id] = scoutFeedback[id] === 'liked' ? null : 'liked';
+      } else {
+        scoutFeedback[id] = scoutFeedback[id] === 'disliked' ? null : 'disliked';
+      }
+      if (!scoutFeedback[id]) delete scoutFeedback[id];
+      await chrome.storage.local.set({ scoutFeedback });
+      renderScout();
+    });
+  });
+
+  const refreshBtn = document.getElementById('scout-refresh-btn');
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', () => renderScout());
+  }
+}
+
+// --- Library ---
+function renderLibrary() {
+  const container = document.getElementById('library-content');
+
+  // Get filtered links
+  let links;
+  if (libraryFilter === 'archive') {
+    links = linkStore.getArchived();
+  } else if (libraryFilter === 'tag' && libraryTagFilter) {
+    links = linkStore.getByTag(libraryTagFilter);
+  } else {
+    links = linkStore.getInbox();
+  }
+
+  // Apply search
+  if (librarySearchQuery) {
+    const q = librarySearchQuery.toLowerCase();
+    links = links.filter(l =>
+      l.title.toLowerCase().includes(q) ||
+      l.url.toLowerCase().includes(q) ||
+      l.tags.some(t => t.toLowerCase().includes(q))
+    );
+  }
+
+  const allTags = linkStore.allTags;
+
+  let html = `
+    <div class="library-header">
+      <div class="library-title-row">
+        <span class="block"></span>
+        <span class="label">library</span>
+      </div>
+      <input class="library-search" type="text" placeholder="search links..." value="${escapeHtml(librarySearchQuery)}" id="library-search-input">
+    </div>
+    <div class="library-filters">
+      <button class="library-filter-btn ${libraryFilter === 'inbox' ? 'active' : ''}" data-filter="inbox">inbox</button>
+      <button class="library-filter-btn ${libraryFilter === 'archive' ? 'active' : ''}" data-filter="archive">archive</button>
+      <button class="library-filter-btn ${libraryFilter === 'tag' ? 'active' : ''}" data-filter="tag">tag</button>
+    </div>
+  `;
+
+  // Tag filter pills when tag filter is active
+  if (libraryFilter === 'tag' && allTags.length > 0) {
+    html += '<div class="library-tag-filters">';
+    allTags.forEach(tag => {
+      html += `<button class="library-tag-filter ${libraryTagFilter === tag ? 'active' : ''}" data-tag="${escapeHtml(tag)}">#${escapeHtml(tag)}</button>`;
+    });
+    html += '</div>';
+  }
+
+  if (links.length === 0) {
+    html += `
+      <div class="library-empty">
+        <div class="library-empty-icon">&#9744;</div>
+        <div class="library-empty-text">no links yet</div>
+        <div class="library-empty-hint">save links with cmd+d</div>
+      </div>
+    `;
+  } else {
+    const grouped = linkStore.groupByDate(links);
+    const order = ['today', 'yesterday', 'this week', 'older'];
+    order.forEach(label => {
+      const group = grouped[label];
+      if (!group || group.length === 0) return;
+      html += `<div class="library-date-group">`;
+      html += `<div class="library-date-label">${label}</div>`;
+      group.forEach(link => {
+        const tagsHtml = link.tags.map(t => `<span class="library-link-tag">#${escapeHtml(t)}</span>`).join('');
+        const domain = safeHost(link.url);
+        const initial = domain ? domain[0].toUpperCase() : '?';
+        html += `
+          <div class="library-link-row" data-link-id="${link.id}" data-url="${escapeHtml(link.url)}">
+            <div class="library-link-favicon">${initial}</div>
+            <div class="library-link-info">
+              <div class="library-link-title">${escapeHtml(link.title || 'Untitled')}</div>
+              <div class="library-link-tags">${tagsHtml}</div>
+            </div>
+            <button class="library-link-menu-btn" data-link-id="${link.id}">&#8230;</button>
+          </div>
+        `;
+      });
+      html += '</div>';
+    });
+  }
+
+  container.innerHTML = html;
+
+  // Wire up events
+  const searchInput = document.getElementById('library-search-input');
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      librarySearchQuery = e.target.value;
+      renderLibrary();
+    });
+    // Restore focus
+    if (librarySearchQuery) {
+      searchInput.focus();
+      searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
+    }
+  }
+
+  container.querySelectorAll('.library-filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      libraryFilter = btn.dataset.filter;
+      libraryTagFilter = null;
+      renderLibrary();
+    });
+  });
+
+  container.querySelectorAll('.library-tag-filter').forEach(btn => {
+    btn.addEventListener('click', () => {
+      libraryTagFilter = btn.dataset.tag;
+      renderLibrary();
+    });
+  });
+
+  container.querySelectorAll('.library-link-row').forEach(row => {
+    row.addEventListener('click', (e) => {
+      if (e.target.closest('.library-link-menu-btn')) return;
+      chrome.tabs.create({ url: row.dataset.url });
+    });
+  });
+
+  container.querySelectorAll('.library-link-menu-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const linkId = btn.dataset.linkId;
+      const link = linkStore.links.find(l => l.id === linkId);
+      if (!link) return;
+
+      const rect = btn.getBoundingClientRect();
+      const items = [
+        { label: 'Open', action: () => chrome.tabs.create({ url: link.url }) },
+        { label: 'Tag', action: () => showTagPopover(linkId, btn) },
+        { divider: true },
+        { label: link.isArchived ? 'Unarchive' : 'Archive', action: async () => {
+          if (link.isArchived) await linkStore.unarchive(linkId);
+          else await linkStore.archive(linkId);
+          renderLibrary();
+        }},
+        { label: 'Delete', danger: true, action: async () => {
+          await linkStore.remove(linkId);
+          renderLibrary();
+        }},
+      ];
+      showContextMenu(e, items);
+    });
+  });
+}
+
+function showTagPopover(linkId, anchorBtn) {
+  // Remove any existing tag popover
+  closeTagPopover();
+
+  const link = linkStore.links.find(l => l.id === linkId);
+  if (!link) return;
+
+  const row = anchorBtn.closest('.library-link-row');
+  const popover = document.createElement('div');
+  popover.className = 'tag-popover';
+  popover.id = 'active-tag-popover';
+
+  const allTags = linkStore.allTags;
+
+  let tagsHtml = '';
+  allTags.forEach(tag => {
+    const active = link.tags.includes(tag);
+    tagsHtml += `<button class="tag-popover-tag ${active ? 'active' : 'inactive'}" data-tag="${escapeHtml(tag)}">#${escapeHtml(tag)}</button>`;
+  });
+
+  popover.innerHTML = `
+    <div class="tag-popover-title">tags</div>
+    <input class="tag-popover-input" type="text" placeholder="add tag..." id="tag-popover-input">
+    <div class="tag-popover-tags">${tagsHtml}</div>
+  `;
+
+  row.style.position = 'relative';
+  row.appendChild(popover);
+  activeTagPopover = popover;
+
+  // Focus input
+  const input = popover.querySelector('#tag-popover-input');
+  setTimeout(() => input.focus(), 50);
+
+  input.addEventListener('keydown', async (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const tag = input.value.trim().toLowerCase().replace('#', '');
+      if (tag) {
+        await linkStore.addTag(linkId, tag);
+        input.value = '';
+        closeTagPopover();
+        renderLibrary();
+      }
+    }
+    if (e.key === 'Escape') {
+      closeTagPopover();
+    }
+  });
+
+  popover.querySelectorAll('.tag-popover-tag').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const tag = btn.dataset.tag;
+      if (link.tags.includes(tag)) {
+        await linkStore.removeTag(linkId, tag);
+      } else {
+        await linkStore.addTag(linkId, tag);
+      }
+      closeTagPopover();
+      renderLibrary();
+    });
+  });
+
+  // Close on outside click
+  setTimeout(() => {
+    document.addEventListener('click', tagPopoverOutsideClick);
+  }, 10);
+}
+
+function tagPopoverOutsideClick(e) {
+  if (activeTagPopover && !activeTagPopover.contains(e.target)) {
+    closeTagPopover();
+  }
+}
+
+function closeTagPopover() {
+  document.removeEventListener('click', tagPopoverOutsideClick);
+  if (activeTagPopover) {
+    activeTagPopover.remove();
+    activeTagPopover = null;
+  }
+}
 
 // --- Start ---
 init();

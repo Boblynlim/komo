@@ -36,9 +36,34 @@ class LinkStore {
     if (link) { link.isArchived = true; await this.saveLinks(); }
   }
 
+  async unarchive(linkId) {
+    const link = this.links.find(l => l.id === linkId);
+    if (link) { link.isArchived = false; await this.saveLinks(); }
+  }
+
   async updateTags(linkId, tags) {
     const link = this.links.find(l => l.id === linkId);
     if (link) { link.tags = tags; await this.saveLinks(); }
+  }
+
+  async addTag(linkId, tag) {
+    const link = this.links.find(l => l.id === linkId);
+    if (link && !link.tags.includes(tag)) {
+      link.tags.push(tag);
+      await this.saveLinks();
+    }
+  }
+
+  async removeTag(linkId, tag) {
+    const link = this.links.find(l => l.id === linkId);
+    if (link) {
+      link.tags = link.tags.filter(t => t !== tag);
+      await this.saveLinks();
+    }
+  }
+
+  isSaved(url) {
+    return this.links.some(l => l.url === url);
   }
 
   search(query) {
@@ -57,6 +82,36 @@ class LinkStore {
 
   getByTag(tag) {
     return this.links.filter(l => l.tags.includes(tag) && !l.isArchived);
+  }
+
+  getInbox() {
+    return this.links.filter(l => !l.isArchived);
+  }
+
+  getArchived() {
+    return this.links.filter(l => l.isArchived);
+  }
+
+  /** Group links by date label: today, yesterday, this week, older */
+  groupByDate(links) {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const yesterday = today - 86400000;
+    const weekAgo = today - 7 * 86400000;
+
+    const groups = {};
+    links.forEach(link => {
+      const saved = link.savedAt;
+      let label;
+      if (saved >= today) label = 'today';
+      else if (saved >= yesterday) label = 'yesterday';
+      else if (saved >= weekAgo) label = 'this week';
+      else label = 'older';
+
+      if (!groups[label]) groups[label] = [];
+      groups[label].push(link);
+    });
+    return groups;
   }
 
   suggestTags(url) {
