@@ -4,11 +4,12 @@ struct PulseView: View {
     @EnvironmentObject var pulseEngine: PulseEngine
     @EnvironmentObject var linkStore: LinkStore
     @EnvironmentObject var tabManager: TabManager
+    @State private var showAPIKeyInput = false
+    @State private var apiKeyInput = ""
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                // Masthead
                 masthead
                     .padding(.top, 48)
                     .padding(.bottom, 32)
@@ -18,7 +19,6 @@ struct PulseView: View {
                 } else if pulseEngine.activeRecommendations.isEmpty {
                     emptyState
                 } else {
-                    // Newsletter sections by category
                     ForEach(Array(pulseEngine.categories.enumerated()), id: \.element) { index, category in
                         if index > 0 {
                             sectionDivider
@@ -29,13 +29,12 @@ struct PulseView: View {
 
                 if let error = pulseEngine.error {
                     Text(error)
-                        .font(.system(size: 12))
+                        .font(.system(size: 12, design: .monospaced))
                         .foregroundStyle(.red)
                         .frame(maxWidth: .infinity)
                         .padding()
                 }
 
-                // Footer
                 footer
                     .padding(.top, 40)
                     .padding(.bottom, 48)
@@ -50,29 +49,37 @@ struct PulseView: View {
     // MARK: - Masthead
 
     var masthead: some View {
-        VStack(spacing: 6) {
-            Text("PULSE")
-                .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                .foregroundStyle(Color.kPink)
-                .tracking(4)
+        VStack(spacing: 8) {
+            // Pixel-style decorative dots
+            HStack(spacing: 3) {
+                ForEach(0..<5, id: \.self) { _ in
+                    Rectangle()
+                        .fill(Color.kPink.opacity(0.4))
+                        .frame(width: 4, height: 4)
+                }
+            }
+            .padding(.bottom, 4)
 
-            Text("Your Weekly Digest")
-                .font(.system(size: 28, weight: .light, design: .serif))
+            Text("SCOUT")
+                .font(.system(size: 24, weight: .bold, design: .monospaced))
                 .foregroundStyle(.primary)
+                .tracking(6)
+
+            // Pixel divider
+            HStack(spacing: 2) {
+                ForEach(0..<40, id: \.self) { i in
+                    Rectangle()
+                        .fill(i % 2 == 0 ? Color.kPink.opacity(0.5) : .clear)
+                        .frame(width: 3, height: 2)
+                }
+            }
+            .padding(.vertical, 4)
 
             if let lastRefreshed = pulseEngine.lastRefreshed {
-                Text(lastRefreshed.formatted(.dateTime.weekday(.wide).month(.wide).day()))
-                    .font(.system(size: 12, weight: .regular))
+                Text(lastRefreshed.formatted(.dateTime.year().month(.abbreviated).day()))
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
                     .foregroundStyle(.tertiary)
-                    .padding(.top, 2)
             }
-
-            // Thin rule under masthead
-            Rectangle()
-                .fill(.quaternary)
-                .frame(height: 1)
-                .padding(.top, 16)
-                .padding(.horizontal, 32)
         }
         .frame(maxWidth: .infinity)
     }
@@ -81,17 +88,27 @@ struct PulseView: View {
 
     func categorySection(_ category: String) -> some View {
         let recs = pulseEngine.recommendations(for: category)
-        return VStack(alignment: .leading, spacing: 16) {
-            // Section header
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
+        return VStack(alignment: .leading, spacing: 12) {
+            // Section header — pixel style
+            HStack(spacing: 6) {
+                // Pixel block indicator
+                Rectangle()
+                    .fill(Color.kPink)
+                    .frame(width: 6, height: 6)
+
                 Text(category.uppercased())
                     .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .foregroundStyle(Color.kPink)
+                    .foregroundStyle(.primary)
                     .tracking(2)
 
-                Rectangle()
-                    .fill(.quaternary)
-                    .frame(height: 1)
+                // Dotted line
+                HStack(spacing: 4) {
+                    ForEach(0..<30, id: \.self) { _ in
+                        Rectangle()
+                            .fill(.quaternary)
+                            .frame(width: 2, height: 2)
+                    }
+                }
             }
             .padding(.horizontal, 32)
 
@@ -99,12 +116,17 @@ struct PulseView: View {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(recs.enumerated()), id: \.element.id) { index, rec in
                     if index > 0 {
-                        Rectangle()
-                            .fill(.quaternary.opacity(0.5))
-                            .frame(height: 1)
-                            .padding(.horizontal, 32)
+                        // Pixel dash separator
+                        HStack(spacing: 4) {
+                            ForEach(0..<20, id: \.self) { _ in
+                                Rectangle()
+                                    .fill(.quaternary.opacity(0.5))
+                                    .frame(width: 3, height: 1)
+                            }
+                        }
+                        .padding(.horizontal, 32)
                     }
-                    PulseRow(recommendation: rec)
+                    ScoutRow(recommendation: rec)
                 }
             }
         }
@@ -112,13 +134,14 @@ struct PulseView: View {
     }
 
     var sectionDivider: some View {
-        HStack(spacing: 12) {
-            Rectangle().fill(.quaternary).frame(height: 1)
-            Image(systemName: "diamond.fill")
-                .font(.system(size: 4))
-                .foregroundStyle(.quaternary)
-            Rectangle().fill(.quaternary).frame(height: 1)
+        HStack(spacing: 4) {
+            ForEach(0..<60, id: \.self) { i in
+                Rectangle()
+                    .fill(i % 3 == 0 ? Color.kPink.opacity(0.2) : .clear)
+                    .frame(width: 2, height: 2)
+            }
         }
+        .frame(maxWidth: .infinity)
         .padding(.horizontal, 48)
     }
 
@@ -126,9 +149,17 @@ struct PulseView: View {
 
     var loadingState: some View {
         VStack(spacing: 12) {
-            ProgressView()
-            Text("Curating this week's picks...")
-                .font(.system(size: 13, design: .serif))
+            // Pixel loading animation
+            HStack(spacing: 3) {
+                ForEach(0..<4, id: \.self) { i in
+                    Rectangle()
+                        .fill(Color.kPink)
+                        .frame(width: 6, height: 6)
+                        .opacity(0.3)
+                }
+            }
+            Text("scouting...")
+                .font(.system(size: 12, weight: .medium, design: .monospaced))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
@@ -137,13 +168,31 @@ struct PulseView: View {
 
     var emptyState: some View {
         VStack(spacing: 12) {
-            Text("Nothing here yet")
-                .font(.system(size: 16, weight: .regular, design: .serif))
+            // Pixel crosshair
+            VStack(spacing: 1) {
+                HStack(spacing: 1) {
+                    Color.clear.frame(width: 4, height: 4)
+                    Rectangle().fill(.quaternary).frame(width: 4, height: 4)
+                    Color.clear.frame(width: 4, height: 4)
+                }
+                HStack(spacing: 1) {
+                    Rectangle().fill(.quaternary).frame(width: 4, height: 4)
+                    Rectangle().fill(Color.kPink.opacity(0.5)).frame(width: 4, height: 4)
+                    Rectangle().fill(.quaternary).frame(width: 4, height: 4)
+                }
+                HStack(spacing: 1) {
+                    Color.clear.frame(width: 4, height: 4)
+                    Rectangle().fill(.quaternary).frame(width: 4, height: 4)
+                    Color.clear.frame(width: 4, height: 4)
+                }
+            }
+
+            Text("nothing to scout yet")
+                .font(.system(size: 13, weight: .medium, design: .monospaced))
                 .foregroundStyle(.secondary)
-            Text("Save some links (⌘D) and Pulse will learn what to recommend.")
-                .font(.system(size: 13))
+            Text("save some links first (⌘D)")
+                .font(.system(size: 11, design: .monospaced))
                 .foregroundStyle(.tertiary)
-                .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
         .padding(60)
@@ -153,29 +202,72 @@ struct PulseView: View {
 
     var footer: some View {
         VStack(spacing: 8) {
-            Rectangle()
-                .fill(.quaternary)
-                .frame(height: 1)
-                .padding(.horizontal, 32)
+            // Pixel divider
+            HStack(spacing: 2) {
+                ForEach(0..<40, id: \.self) { i in
+                    Rectangle()
+                        .fill(i % 2 == 0 ? Color.secondary.opacity(0.2) : Color.clear)
+                        .frame(width: 3, height: 2)
+                }
+            }
+            .frame(maxWidth: .infinity)
 
             HStack(spacing: 16) {
                 Button(action: {
                     Task { await pulseEngine.refresh(links: linkStore.links) }
                 }) {
-                    Label("Refresh", systemImage: "arrow.clockwise")
-                        .font(.system(size: 11, weight: .medium))
+                    Label("refresh", systemImage: "arrow.clockwise")
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
                 .disabled(pulseEngine.isLoading)
 
-                Text("·")
+                Text("//")
+                    .font(.system(size: 10, design: .monospaced))
                     .foregroundStyle(.quaternary)
 
-                Text("Curated by Pulse for you")
-                    .font(.system(size: 11, design: .serif))
+                Text("scouted for you")
+                    .font(.system(size: 10, design: .monospaced))
                     .foregroundStyle(.tertiary)
-                    .italic()
+
+                Text("//")
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.quaternary)
+
+                Button(action: { showAPIKeyInput.toggle() }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "key")
+                            .font(.system(size: 9))
+                        Text(pulseEngine.hasAPIKey ? "key set" : "add key")
+                            .font(.system(size: 10, design: .monospaced))
+                    }
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(pulseEngine.hasAPIKey ? Color.secondary : Color.kPink)
+                .popover(isPresented: $showAPIKeyInput) {
+                    VStack(spacing: 10) {
+                        Text("ANTHROPIC API KEY")
+                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .tracking(1)
+                        SecureField("sk-ant-...", text: $apiKeyInput)
+                            .textFieldStyle(.roundedBorder)
+                            .font(.system(size: 12, design: .monospaced))
+                            .frame(width: 280)
+                            .onSubmit {
+                                pulseEngine.setAPIKey(apiKeyInput)
+                                showAPIKeyInput = false
+                            }
+                        Button("save") {
+                            pulseEngine.setAPIKey(apiKeyInput)
+                            showAPIKeyInput = false
+                        }
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .buttonStyle(.borderedProminent)
+                        .tint(Color.kPink)
+                    }
+                    .padding(16)
+                }
             }
             .padding(.top, 8)
         }
@@ -184,7 +276,7 @@ struct PulseView: View {
 
 // MARK: - Row
 
-struct PulseRow: View {
+struct ScoutRow: View {
     let recommendation: PulseRecommendation
     @EnvironmentObject var pulseEngine: PulseEngine
     @EnvironmentObject var tabManager: TabManager
@@ -197,41 +289,41 @@ struct PulseRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            // Title as link
+            // Title + domain
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(recommendation.title)
-                    .font(.system(size: 15, weight: .medium))
+                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
                     .foregroundStyle(.primary)
 
                 Text(recommendation.domain)
-                    .font(.system(size: 10, weight: .regular, design: .monospaced))
-                    .foregroundStyle(.tertiary)
+                    .font(.system(size: 9, weight: .regular, design: .monospaced))
+                    .foregroundStyle(.quaternary)
             }
 
             // Description
             Text(recommendation.description)
-                .font(.system(size: 13, weight: .regular, design: .serif))
+                .font(.system(size: 12, weight: .regular))
                 .foregroundStyle(.secondary)
                 .lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)
 
-            // Why — editorial note
+            // Why — scout note
             HStack(spacing: 4) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 8))
+                Rectangle()
+                    .fill(Color.kPink)
+                    .frame(width: 3, height: 3)
                 Text(recommendation.reason)
-                    .font(.system(size: 11, weight: .medium))
-                    .italic()
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
             }
             .foregroundStyle(Color.kPink.opacity(0.7))
             .padding(.top, 2)
 
-            // Actions — always show feedback, show read/save on hover
+            // Actions
             HStack(spacing: 12) {
                 if isHovering {
                     Button(action: openRecommendation) {
-                        Label("Read", systemImage: "arrow.up.right")
-                            .font(.system(size: 10, weight: .medium))
+                        Label("open", systemImage: "arrow.up.right")
+                            .font(.system(size: 10, weight: .medium, design: .monospaced))
                             .padding(.vertical, 6)
                             .padding(.horizontal, 4)
                             .contentShape(Rectangle())
@@ -240,8 +332,8 @@ struct PulseRow: View {
                     .foregroundStyle(.blue)
 
                     Button(action: saveRecommendation) {
-                        Label(isSaved ? "Saved" : "Save", systemImage: isSaved ? "bookmark.fill" : "bookmark")
-                            .font(.system(size: 10, weight: .medium))
+                        Label(isSaved ? "saved" : "save", systemImage: isSaved ? "bookmark.fill" : "bookmark")
+                            .font(.system(size: 10, weight: .medium, design: .monospaced))
                             .padding(.vertical, 6)
                             .padding(.horizontal, 4)
                             .contentShape(Rectangle())
@@ -298,8 +390,7 @@ struct PulseRow: View {
     private func saveRecommendation() {
         linkStore.save(
             url: recommendation.url,
-            title: recommendation.title,
-            tags: recommendation.tags
+            title: recommendation.title
         )
     }
 }

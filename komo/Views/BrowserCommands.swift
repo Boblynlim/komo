@@ -43,7 +43,7 @@ struct BrowserCommands: Commands {
             }
             .keyboardShortcut("k", modifiers: .command)
 
-            Button("Pulse") {
+            Button("Scout") {
                 NotificationCenter.default.post(name: .togglePulse, object: nil)
             }
             .keyboardShortcut("p", modifiers: [.command, .shift])

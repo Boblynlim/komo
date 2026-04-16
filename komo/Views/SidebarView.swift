@@ -95,7 +95,7 @@ struct SidebarView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(Color.kPink)
-                .help("Pulse — Discover new stuff (⌘⇧P)")
+                .help("Scout — Discover new stuff (⌘⇧P)")
 
                 // New folder icon — bottom right
                 Button(action: { isCreatingFolder = true }) {
