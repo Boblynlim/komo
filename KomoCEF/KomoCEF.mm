@@ -1,9 +1,243 @@
-// KomoCEF bridge implementation.
+// KomoCEF bridge implementation — embeds the Chromium engine (CEF) into komo.
+
+#import <Cocoa/Cocoa.h>
+
+#include <string>
 
 #include "KomoCEF.h"
 
+#include "include/cef_app.h"
+#include "include/cef_application_mac.h"
+#include "include/cef_browser.h"
+#include "include/cef_client.h"
 #include "include/cef_version.h"
+#include "include/wrapper/cef_library_loader.h"
 
-extern "C" const char* komo_cef_version(void) {
+const char* komo_cef_version(void) {
   return CEF_VERSION;
+}
+
+// ---------------------------------------------------------------------------
+// NSApplication subclass required by CEF (CefAppProtocol). Installed via the
+// app bundle's Info.plist NSPrincipalClass = "KomoCEFApplication".
+// ---------------------------------------------------------------------------
+@interface KomoCEFApplication : NSApplication <CefAppProtocol> {
+ @private
+  BOOL handlingSendEvent_;
+}
+@end
+
+@implementation KomoCEFApplication
+- (BOOL)isHandlingSendEvent {
+  return handlingSendEvent_;
+}
+- (void)setHandlingSendEvent:(BOOL)handlingSendEvent {
+  handlingSendEvent_ = handlingSendEvent;
+}
+- (void)sendEvent:(NSEvent*)event {
+  CefScopedSendingEvent sendingEventScoper;
+  [super sendEvent:event];
+}
+@end
+
+// ---------------------------------------------------------------------------
+// CefApp — drives the external message pump so CEF cooperates with komo's run
+// loop instead of owning it.
+// ---------------------------------------------------------------------------
+namespace {
+
+class KomoCefApp : public CefApp, public CefBrowserProcessHandler {
+ public:
+  KomoCefApp() = default;
+
+  CefRefPtr<CefBrowserProcessHandler> GetBrowserProcessHandler() override {
+    return this;
+  }
+
+  void OnScheduleMessagePumpWork(int64_t delay_ms) override {
+    if (delay_ms < 0) {
+      delay_ms = 0;
+    }
+    // Pump CEF work on the main thread after the requested delay.
+    dispatch_after(
+        dispatch_time(DISPATCH_TIME_NOW, delay_ms * NSEC_PER_MSEC),
+        dispatch_get_main_queue(), ^{
+          CefDoMessageLoopWork();
+        });
+  }
+
+ private:
+  IMPLEMENT_REFCOUNTING(KomoCefApp);
+};
+
+// CefClient for a single browser. Forwards state changes to Swift callbacks.
+class KomoCefClient : public CefClient,
+                      public CefDisplayHandler,
+                      public CefLoadHandler,
+                      public CefLifeSpanHandler {
+ public:
+  KomoCefClient(void* user_data, KomoBrowserCallbacks cbs)
+      : user_data_(user_data), cbs_(cbs) {}
+
+  CefRefPtr<CefDisplayHandler> GetDisplayHandler() override { return this; }
+  CefRefPtr<CefLoadHandler> GetLoadHandler() override { return this; }
+  CefRefPtr<CefLifeSpanHandler> GetLifeSpanHandler() override { return this; }
+
+  // CefLifeSpanHandler
+  void OnAfterCreated(CefRefPtr<CefBrowser> browser) override {
+    browser_ = browser;
+  }
+  void OnBeforeClose(CefRefPtr<CefBrowser> browser) override {
+    browser_ = nullptr;
+  }
+
+  // CefDisplayHandler
+  void OnTitleChange(CefRefPtr<CefBrowser> browser,
+                     const CefString& title) override {
+    if (cbs_.onTitleChange) {
+      const std::string s = title.ToString();
+      cbs_.onTitleChange(user_data_, s.c_str());
+    }
+  }
+  void OnAddressChange(CefRefPtr<CefBrowser> browser,
+                       CefRefPtr<CefFrame> frame,
+                       const CefString& url) override {
+    if (frame->IsMain() && cbs_.onURLChange) {
+      const std::string s = url.ToString();
+      cbs_.onURLChange(user_data_, s.c_str());
+    }
+  }
+
+  // CefLoadHandler
+  void OnLoadingStateChange(CefRefPtr<CefBrowser> browser,
+                            bool isLoading,
+                            bool canGoBack,
+                            bool canGoForward) override {
+    if (cbs_.onLoadingChange) {
+      cbs_.onLoadingChange(user_data_, isLoading);
+    }
+    if (cbs_.onCanGoBackChange) {
+      cbs_.onCanGoBackChange(user_data_, canGoBack);
+    }
+    if (cbs_.onCanGoForwardChange) {
+      cbs_.onCanGoForwardChange(user_data_, canGoForward);
+    }
+  }
+
+  CefRefPtr<CefBrowser> browser() { return browser_; }
+
+ private:
+  void* user_data_;
+  KomoBrowserCallbacks cbs_;
+  CefRefPtr<CefBrowser> browser_;
+
+  IMPLEMENT_REFCOUNTING(KomoCefClient);
+};
+
+std::string BundleSubPath(const char* sub) {
+  NSString* base = [[NSBundle mainBundle] bundlePath];
+  NSString* full = [base stringByAppendingString:[NSString stringWithUTF8String:sub]];
+  return std::string([full UTF8String]);
+}
+
+}  // namespace
+
+// ---------------------------------------------------------------------------
+// C API
+// ---------------------------------------------------------------------------
+bool komo_cef_initialize(void) {
+  // Load the CEF framework at runtime (required by the macOS sandbox model).
+  static CefScopedLibraryLoader loader;
+  if (!loader.LoadInMain()) {
+    return false;
+  }
+
+  CefMainArgs main_args(0, nullptr);
+
+  CefSettings settings;
+  settings.external_message_pump = true;
+  settings.no_sandbox = true;
+
+  CefString(&settings.framework_dir_path)
+      .FromString(BundleSubPath(
+          "/Contents/Frameworks/Chromium Embedded Framework.framework"));
+  CefString(&settings.main_bundle_path)
+      .FromString(std::string([[[NSBundle mainBundle] bundlePath] UTF8String]));
+  CefString(&settings.browser_subprocess_path)
+      .FromString(BundleSubPath(
+          "/Contents/Frameworks/komo Helper.app/Contents/MacOS/komo Helper"));
+
+  CefRefPtr<KomoCefApp> app(new KomoCefApp);
+  return CefInitialize(main_args, settings, app.get(), nullptr);
+}
+
+void komo_cef_shutdown(void) {
+  CefShutdown();
+}
+
+void* komo_cef_create_browser(void* nsview,
+                              const char* url,
+                              void* userData,
+                              KomoBrowserCallbacks callbacks) {
+  CefRefPtr<KomoCefClient> client(new KomoCefClient(userData, callbacks));
+
+  NSView* view = (__bridge NSView*)nsview;
+  const NSRect b = [view bounds];
+
+  CefWindowInfo window_info;
+  CefRect bounds(0, 0, static_cast<int>(b.size.width),
+                 static_cast<int>(b.size.height));
+  window_info.SetAsChild(static_cast<CefWindowHandle>(nsview), bounds);
+  window_info.runtime_style = CEF_RUNTIME_STYLE_ALLOY;
+
+  CefBrowserSettings browser_settings;
+  if (!CefBrowserHost::CreateBrowser(window_info, client,
+                                     std::string(url ? url : "about:blank"),
+                                     browser_settings, nullptr, nullptr)) {
+    return nullptr;
+  }
+
+  // Keep the client alive for the handle's lifetime (released in close).
+  client->AddRef();
+  return client.get();
+}
+
+void komo_cef_load_url(void* handle, const char* url) {
+  if (!handle || !url) {
+    return;
+  }
+  auto* client = static_cast<KomoCefClient*>(handle);
+  if (CefRefPtr<CefBrowser> b = client->browser()) {
+    b->GetMainFrame()->LoadURL(std::string(url));
+  }
+}
+
+void komo_cef_go_back(void* handle) {
+  if (!handle) return;
+  if (CefRefPtr<CefBrowser> b = static_cast<KomoCefClient*>(handle)->browser()) {
+    b->GoBack();
+  }
+}
+
+void komo_cef_go_forward(void* handle) {
+  if (!handle) return;
+  if (CefRefPtr<CefBrowser> b = static_cast<KomoCefClient*>(handle)->browser()) {
+    b->GoForward();
+  }
+}
+
+void komo_cef_reload(void* handle) {
+  if (!handle) return;
+  if (CefRefPtr<CefBrowser> b = static_cast<KomoCefClient*>(handle)->browser()) {
+    b->Reload();
+  }
+}
+
+void komo_cef_close_browser(void* handle) {
+  if (!handle) return;
+  auto* client = static_cast<KomoCefClient*>(handle);
+  if (CefRefPtr<CefBrowser> b = client->browser()) {
+    b->GetHost()->CloseBrowser(true);
+  }
+  client->Release();
 }

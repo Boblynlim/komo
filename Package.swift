@@ -16,7 +16,7 @@ let package = Package(
             path: "KomoCEF",
             publicHeadersPath: "include",
             cxxSettings: [
-                .unsafeFlags(["-I\(cefRoot)", "-std=c++17", "-fobjc-arc"])
+                .unsafeFlags(["-I\(cefRoot)", "-std=c++20", "-fobjc-arc"])
             ]
         ),
         .executableTarget(
