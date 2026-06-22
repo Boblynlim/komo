@@ -48,6 +48,7 @@ void komo_cef_load_url(void* browser, const char* url);
 void komo_cef_go_back(void* browser);
 void komo_cef_go_forward(void* browser);
 void komo_cef_reload(void* browser);
+void komo_cef_stop_load(void* browser);
 void komo_cef_close_browser(void* browser);
 
 #ifdef __cplusplus

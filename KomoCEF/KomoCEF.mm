@@ -158,6 +158,15 @@ bool komo_cef_initialize(void) {
   settings.external_message_pump = true;
   settings.no_sandbox = true;
 
+  // komo-specific cache dir, so CEF's process singleton is well-defined
+  // (the default is shared and collides with other CEF apps/instances).
+  NSString* appSupport = [NSSearchPathForDirectoriesInDomains(
+      NSApplicationSupportDirectory, NSUserDomainMask, YES) firstObject];
+  CefString(&settings.root_cache_path)
+      .FromString(std::string(
+          [[appSupport stringByAppendingPathComponent:@"komo/cef_cache"]
+              UTF8String]));
+
   CefString(&settings.framework_dir_path)
       .FromString(BundleSubPath(
           "/Contents/Frameworks/Chromium Embedded Framework.framework"));
@@ -183,6 +192,8 @@ void* komo_cef_create_browser(void* nsview,
 
   NSView* view = (__bridge NSView*)nsview;
   const NSRect b = [view bounds];
+  NSLog(@"komo: create_browser url=%s view=%p size=%.0fx%.0f", url ? url : "(null)",
+        nsview, b.size.width, b.size.height);
 
   CefWindowInfo window_info;
   CefRect bounds(0, 0, static_cast<int>(b.size.width),
@@ -191,9 +202,11 @@ void* komo_cef_create_browser(void* nsview,
   window_info.runtime_style = CEF_RUNTIME_STYLE_ALLOY;
 
   CefBrowserSettings browser_settings;
-  if (!CefBrowserHost::CreateBrowser(window_info, client,
-                                     std::string(url ? url : "about:blank"),
-                                     browser_settings, nullptr, nullptr)) {
+  bool ok = CefBrowserHost::CreateBrowser(window_info, client,
+                                          std::string(url ? url : "about:blank"),
+                                          browser_settings, nullptr, nullptr);
+  NSLog(@"komo: CefBrowserHost::CreateBrowser -> %d", ok);
+  if (!ok) {
     return nullptr;
   }
 
@@ -230,6 +243,13 @@ void komo_cef_reload(void* handle) {
   if (!handle) return;
   if (CefRefPtr<CefBrowser> b = static_cast<KomoCefClient*>(handle)->browser()) {
     b->Reload();
+  }
+}
+
+void komo_cef_stop_load(void* handle) {
+  if (!handle) return;
+  if (CefRefPtr<CefBrowser> b = static_cast<KomoCefClient*>(handle)->browser()) {
+    b->StopLoad();
   }
 }
 
