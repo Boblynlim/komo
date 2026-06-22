@@ -91,25 +91,16 @@ class PulseEngine: ObservableObject {
                 category: "Interactive & Visual"
             ),
             PulseRecommendation(
-                title: "Explorable Explanations",
-                url: "https://explorabl.es",
-                description: "A curated hub of interactive articles that teach through play — math, science, systems thinking, economics. Learning by doing.",
-                reason: "Interactive learning meets curiosity",
-                tags: ["interactive", "education", "math"],
-                domain: "explorabl.es",
-                category: "Interactive & Visual"
-            ),
-            PulseRecommendation(
                 title: "Neal.fun",
                 url: "https://neal.fun",
                 description: "Playful interactive experiments — the size of space, spend Bill Gates' money, the deep sea. Each one is a tiny, perfect rabbit hole.",
-                reason: "Delightful, shareable rabbit holes",
+                reason: "Delightful one-person web toys",
                 tags: ["interactive", "fun", "visualization"],
                 domain: "neal.fun",
                 category: "Interactive & Visual"
             ),
 
-            // — Indie Web & Discovery
+            // — Indie Discovery
             PulseRecommendation(
                 title: "Marginalia Search",
                 url: "https://search.marginalia.nu",
@@ -117,27 +108,25 @@ class PulseEngine: ObservableObject {
                 reason: "Rediscover the weird, personal web",
                 tags: ["search", "indie-web", "discovery"],
                 domain: "search.marginalia.nu",
-                category: "Indie Web & Discovery"
+                category: "Indie Discovery"
             ),
             PulseRecommendation(
                 title: "Hundred Rabbits",
                 url: "https://100r.co",
-                description: "Two artists living on a sailboat, building open-source creative tools that run on minimal hardware. Software as a lifestyle philosophy.",
+                description: "Two artists on a sailboat building open-source creative tools that run on minimal hardware. Software as a lifestyle philosophy.",
                 reason: "Indie software meets unconventional living",
                 tags: ["indie", "creative-tools", "open-source"],
                 domain: "100r.co",
-                category: "Indie Web & Discovery"
+                category: "Indie Discovery"
             ),
-
-            // — Data & Storytelling
             PulseRecommendation(
-                title: "The Pudding",
-                url: "https://pudding.cool",
-                description: "Visual essays on culture, language, music, and trends — each one is a small interactive masterpiece backed by real data.",
-                reason: "Data journalism with craft and taste",
-                tags: ["data-viz", "culture", "essays"],
-                domain: "pudding.cool",
-                category: "Data & Storytelling"
+                title: "XXIIVV — Devine Lu Linvega",
+                url: "https://wiki.xxiivv.com",
+                description: "A personal wiki spanning programming languages, music, sailing logs, and conlangs. Beautifully handcrafted.",
+                reason: "A digital garden that feels like discovering someone's whole world",
+                tags: ["wiki", "personal", "creative-coding"],
+                domain: "wiki.xxiivv.com",
+                category: "Indie Discovery"
             ),
 
             // — Unconventional Tech
@@ -150,8 +139,17 @@ class PulseEngine: ObservableObject {
                 domain: "solar.lowtechmagazine.com",
                 category: "Unconventional Tech"
             ),
+            PulseRecommendation(
+                title: "The Pudding",
+                url: "https://pudding.cool",
+                description: "Visual essays on culture, language, music, and trends — each one is a small interactive masterpiece backed by real data.",
+                reason: "Data journalism with craft and taste",
+                tags: ["data-viz", "culture", "essays"],
+                domain: "pudding.cool",
+                category: "Unconventional Tech"
+            ),
 
-            // — CS & Learning
+            // — Deep Dives
             PulseRecommendation(
                 title: "Algorithms by Jeff Erickson",
                 url: "https://jeffe.cs.illinois.edu/teaching/algorithms/",
@@ -159,7 +157,16 @@ class PulseEngine: ObservableObject {
                 reason: "The algorithms textbook you wish you'd had",
                 tags: ["algorithms", "cs", "textbook"],
                 domain: "jeffe.cs.illinois.edu",
-                category: "CS & Learning"
+                category: "Deep Dives"
+            ),
+            PulseRecommendation(
+                title: "href.cool",
+                url: "https://href.cool",
+                description: "A curated link directory of the weird and wonderful web — organized by vibes, not SEO. Someone's personal collection of internet treasures.",
+                reason: "A human-curated map of the interesting internet",
+                tags: ["links", "curation", "directory"],
+                domain: "href.cool",
+                category: "Deep Dives"
             ),
         ]
         lastRefreshed = .now
@@ -183,13 +190,27 @@ class PulseEngine: ObservableObject {
         let dismissedTitles = recommendations.filter { $0.feedback == .dismissed }.map { $0.title }
 
         let systemPrompt = """
-        You are Pulse, a personal internet scout. Your job is to recommend interesting websites, \
+        You are Scout, a personal internet scout. Your job is to recommend interesting websites, \
         articles, tools, and rabbit holes based on the user's taste profile.
+
+        Discovery philosophy:
+        - Do NOT rely on SEO prominence. A site's Google ranking is irrelevant to whether it's good.
+        - Discover the way webrings, blogrolls, and human-curated directories discover — by \
+          following links from interesting places, not by searching keywords.
+        - The best recommendation is something they'd never find through a search engine but \
+          would love once they see it.
+        - A wide range is good: personal pages, tools, academic resources, niche communities, \
+          interactive experiments, small company projects, one-person blogs, institutional \
+          archives, fan sites — anything that's genuinely good.
+        - Draw from the full web: Neocities pages and MIT research papers are both fair game. \
+          The filter is quality and relevance, not size or polish.
+        - Think like someone browsing through a webring, an Are.na channel, a blogroll, or a \
+          human-curated link directory — not like someone googling.
 
         Rules:
         - Recommend 8-10 items grouped into 3-5 categories
         - Each item must be a real, existing website or article
-        - Focus on discovering things they HAVEN'T seen, not popular mainstream sites
+        - Don't default to the sites that rank highest on Google — dig deeper
         - Match their interests but also surprise them with adjacent topics
         - No paywalled content unless it has a free tier
         - Respond ONLY with valid JSON, no markdown
