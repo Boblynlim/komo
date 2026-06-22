@@ -1,4 +1,5 @@
 import SwiftUI
+import KomoCEF
 
 extension Color {
     // #E866D4
@@ -15,6 +16,11 @@ struct komoApp: App {
     @StateObject private var linkStore = LinkStore()
     @StateObject private var downloadManager = DownloadManager()
     @StateObject private var pulseEngine = PulseEngine()
+
+    init() {
+        // Proves komo links + calls the Chromium (CEF) bridge.
+        print("komo: Chromium engine (CEF) v\(String(cString: komo_cef_version()))")
+    }
 
     var body: some Scene {
         WindowGroup {
