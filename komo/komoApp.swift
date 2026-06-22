@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import KomoCEF
 
 extension Color {
@@ -10,17 +11,29 @@ extension ShapeStyle where Self == Color {
     static var kPink: Color { .kPink }
 }
 
+// Initializes the Chromium engine (CEF) at startup, before any browser/tab is
+// created. applicationWillFinishLaunching runs before the UI appears.
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        if komo_cef_initialize() {
+            NSLog("komo: Chromium engine (CEF) v%s initialized", komo_cef_version())
+        } else {
+            NSLog("komo: CEF failed to initialize")
+        }
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        komo_cef_shutdown()
+    }
+}
+
 @main
 struct komoApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var tabManager = TabManager()
     @StateObject private var linkStore = LinkStore()
     @StateObject private var downloadManager = DownloadManager()
     @StateObject private var pulseEngine = PulseEngine()
-
-    init() {
-        // Proves komo links + calls the Chromium (CEF) bridge.
-        print("komo: Chromium engine (CEF) v\(String(cString: komo_cef_version()))")
-    }
 
     var body: some Scene {
         WindowGroup {

@@ -1,5 +1,4 @@
 import Foundation
-import WebKit
 import Combine
 
 struct FolderSession: Codable {
@@ -14,8 +13,6 @@ class TabManager: ObservableObject {
     @Published var isSidebarVisible: Bool = true
     @Published var folders: [TabFolder] = []
 
-    private var contentRuleList: WKContentRuleList?
-    private var observers: [UUID: [AnyCancellable]] = [:]
     private var sessionSaveCancellable: AnyCancellable?
 
     private var sessionURL: URL {
@@ -40,8 +37,6 @@ class TabManager: ObservableObject {
     }
 
     init() {
-        loadContentBlocker()
-
         if !restoreSession() {
             createNewTab(url: URL(string: "https://apple.com")!)
         }
@@ -63,49 +58,16 @@ class TabManager: ObservableObject {
             return
         }
 
-        let config = WKWebViewConfiguration()
-        config.preferences.isElementFullscreenEnabled = true
-
-        if let ruleList = contentRuleList {
-            config.userContentController.add(ruleList)
-        }
-
-        let tab = Tab(configuration: config)
+        let tab = Tab()
         tab.isPinned = isPinned
-        setupObservers(for: tab)
 
         tabs.append(tab)
         if switchTo { selectedTabID = tab.id }
         tab.load(url!)
     }
 
-    private func setupObservers(for tab: Tab) {
-        let titleObserver = tab.webView.publisher(for: \.title)
-            .compactMap { $0 }
-            .receive(on: DispatchQueue.main)
-            .assign(to: \.title, on: tab)
-
-        let urlObserver = tab.webView.publisher(for: \.url)
-            .receive(on: DispatchQueue.main)
-            .assign(to: \.url, on: tab)
-
-        let loadingObserver = tab.webView.publisher(for: \.isLoading)
-            .receive(on: DispatchQueue.main)
-            .assign(to: \.isLoading, on: tab)
-
-        let backObserver = tab.webView.publisher(for: \.canGoBack)
-            .receive(on: DispatchQueue.main)
-            .assign(to: \.canGoBack, on: tab)
-
-        let forwardObserver = tab.webView.publisher(for: \.canGoForward)
-            .receive(on: DispatchQueue.main)
-            .assign(to: \.canGoForward, on: tab)
-
-        observers[tab.id] = [titleObserver, urlObserver, loadingObserver, backObserver, forwardObserver]
-    }
-
     func closeTab(_ tab: Tab) {
-        observers.removeValue(forKey: tab.id)
+        tab.closeBrowser()
         for folder in folders {
             folder.tabIDs.removeAll { $0 == tab.id }
         }
@@ -254,17 +216,10 @@ class TabManager: ObservableObject {
         for ts in session.tabs {
             guard let tabID = UUID(uuidString: ts.id) else { continue }
 
-            let config = WKWebViewConfiguration()
-            config.preferences.isElementFullscreenEnabled = true
-            if let ruleList = contentRuleList {
-                config.userContentController.add(ruleList)
-            }
-
-            let tab = Tab(id: tabID, configuration: config)
+            let tab = Tab(id: tabID)
             tab.title = ts.title
             tab.isPinned = ts.isPinned
             tab.isFavorite = ts.isFavorite
-            setupObservers(for: tab)
             tabs.append(tab)
 
             if let urlString = ts.url, let url = URL(string: urlString) {
@@ -294,68 +249,6 @@ class TabManager: ObservableObject {
         return true
     }
 
-    // MARK: - Content Blocker
-
-    private func loadContentBlocker() {
-        guard let url = Bundle.main.url(forResource: "content-blocklist", withExtension: "json"),
-              let json = try? String(contentsOf: url) else {
-            loadDefaultBlockRules()
-            return
-        }
-
-        WKContentRuleListStore.default().compileContentRuleList(
-            forIdentifier: "komo-blocker",
-            encodedContentRuleList: json
-        ) { [weak self] ruleList, error in
-            if let ruleList = ruleList {
-                DispatchQueue.main.async {
-                    self?.contentRuleList = ruleList
-                    for tab in self?.tabs ?? [] {
-                        tab.webView.configuration.userContentController.add(ruleList)
-                    }
-                }
-            }
-        }
-    }
-
-    private func loadDefaultBlockRules() {
-        let rules = """
-        [
-            {
-                "trigger": { "url-filter": ".*", "resource-type": ["popup"] },
-                "action": { "type": "block" }
-            },
-            {
-                "trigger": { "url-filter": "googleadservices\\\\.com" },
-                "action": { "type": "block" }
-            },
-            {
-                "trigger": { "url-filter": "doubleclick\\\\.net" },
-                "action": { "type": "block" }
-            },
-            {
-                "trigger": { "url-filter": "google-analytics\\\\.com" },
-                "action": { "type": "block" }
-            },
-            {
-                "trigger": { "url-filter": "facebook\\\\.com/tr" },
-                "action": { "type": "block" }
-            }
-        ]
-        """
-
-        WKContentRuleListStore.default().compileContentRuleList(
-            forIdentifier: "komo-blocker-default",
-            encodedContentRuleList: rules
-        ) { [weak self] ruleList, error in
-            if let ruleList = ruleList {
-                DispatchQueue.main.async {
-                    self?.contentRuleList = ruleList
-                    for tab in self?.tabs ?? [] {
-                        tab.webView.configuration.userContentController.add(ruleList)
-                    }
-                }
-            }
-        }
-    }
+    // NOTE: Content blocking (ad/tracker filtering) was WKWebView-based and is
+    // temporarily removed. It will return via a CEF request handler.
 }

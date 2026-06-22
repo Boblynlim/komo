@@ -29,7 +29,7 @@ struct NavButtonsInner: View {
             }
             NavButton(icon: tab.isLoading ? "xmark" : "arrow.clockwise", enabled: true) {
                 if tab.isLoading {
-                    tab.webView.stopLoading()
+                    tab.stopLoading()
                 } else {
                     tab.reload()
                 }
