@@ -86,8 +86,17 @@ struct CommandBar: View {
             // doesn't react to keys while the command bar is open.
             tabManager.selectedTab?.setBrowserFocus(false)
             isFocused = true
-            selection.index = 0
             selection.count = flatResults.count
+            // Start on the tab you're currently viewing, if it's in the list.
+            if let current = tabManager.selectedTab,
+               let idx = flatResults.firstIndex(where: { result in
+                   if case .tab(let t) = result { return t.id == current.id }
+                   return false
+               }) {
+                selection.index = idx
+            } else {
+                selection.index = 0
+            }
         }
         .onDisappear {
             tabManager.selectedTab?.setBrowserFocus(true)
@@ -98,6 +107,11 @@ struct CommandBar: View {
         }
         .onChange(of: flatResults.count) { _, n in
             selection.count = n
+        }
+        .onChange(of: selection.index) {
+            // Arrow/Tab nav goes through an app-level monitor, which can steal
+            // focus from the field — re-assert it so typing + Enter keep working.
+            isFocused = true
         }
         .onKeyPress(.escape) {
             if activeFolder != nil || activeLinkTag != nil {
@@ -117,32 +131,44 @@ struct CommandBar: View {
     }
 
     private var resultsList: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                ForEach(sections) { section in
-                    if let label = section.label {
-                        Text(label)
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                            .textCase(.uppercase)
-                            .padding(.horizontal, 14)
-                            .padding(.top, 8)
-                            .padding(.bottom, 4)
-                    }
-                    ForEach(Array(section.items.enumerated()), id: \.offset) { itemIndex, result in
-                        let globalIndex = globalIndexOf(section: section, itemIndex: itemIndex)
-                        Button {
-                            execute(result)
-                        } label: {
-                            CommandResultRow(result: result, isSelected: globalIndex == selection.index)
+        // Single snapshot of the sections so row indices are consistent (the
+        // `sections` computed property mints fresh ids on every access).
+        let secs = sections
+        return ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(secs.enumerated()), id: \.offset) { sectionIdx, section in
+                        if let label = section.label {
+                            Text(label)
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                                .textCase(.uppercase)
+                                .padding(.horizontal, 14)
+                                .padding(.top, 8)
+                                .padding(.bottom, 4)
                         }
-                        .buttonStyle(.plain)
+                        let base = secs.prefix(sectionIdx).reduce(0) { $0 + $1.items.count }
+                        ForEach(Array(section.items.enumerated()), id: \.offset) { itemIndex, result in
+                            Button {
+                                execute(result)
+                            } label: {
+                                CommandResultRow(result: result, isSelected: base + itemIndex == selection.index)
+                            }
+                            .buttonStyle(.plain)
+                            .id(base + itemIndex)
+                        }
                     }
                 }
+                .padding(.vertical, 4)
             }
-            .padding(.vertical, 4)
+            .frame(maxHeight: 360)
+            .onChange(of: selection.index) { _, idx in
+                // Keep the highlighted row scrolled into view.
+                withAnimation(.easeOut(duration: 0.12)) {
+                    proxy.scrollTo(idx, anchor: .center)
+                }
+            }
         }
-        .frame(maxHeight: 360)
     }
 
     private var placeholder: String {
@@ -171,7 +197,7 @@ struct CommandBar: View {
         if !matchingTabs.isEmpty {
             sections.append(CommandSection(
                 label: "Open Tabs",
-                items: matchingTabs.prefix(5).map { .tab($0) }
+                items: matchingTabs.map { .tab($0) }
             ))
         }
 
@@ -369,7 +395,7 @@ struct CommandResultRow: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(isSelected ? Color.kPink.opacity(0.28) : .clear, in: RoundedRectangle(cornerRadius: 8))
+        .background(isSelected ? Color.kPink.opacity(0.30) : .clear, in: RoundedRectangle(cornerRadius: 8))
         .padding(.horizontal, 6)
         .padding(.vertical, 1)
         .contentShape(Rectangle())
