@@ -67,6 +67,19 @@ class KomoCefClient : public CefClient,
   KomoCefClient(void* user_data, KomoBrowserCallbacks cbs)
       : user_data_(user_data), cbs_(cbs) {}
 
+  // Keep the host NSView alive for the browser's whole lifetime — the Swift Tab
+  // (which owns it) can dealloc before CEF finishes its async CloseBrowser.
+  void SetHostView(void* nsview) {
+    if (nsview) {
+      host_view_ = CFBridgingRetain((__bridge id)nsview);
+    }
+  }
+  // Stop forwarding callbacks into Swift once the tab is going away.
+  void ClearCallbacks() {
+    user_data_ = nullptr;
+    cbs_ = KomoBrowserCallbacks{};
+  }
+
   CefRefPtr<CefDisplayHandler> GetDisplayHandler() override { return this; }
   CefRefPtr<CefLoadHandler> GetLoadHandler() override { return this; }
   CefRefPtr<CefLifeSpanHandler> GetLifeSpanHandler() override { return this; }
@@ -81,6 +94,10 @@ class KomoCefClient : public CefClient,
   }
   void OnBeforeClose(CefRefPtr<CefBrowser> browser) override {
     browser_ = nullptr;
+    if (host_view_) {
+      CFRelease(host_view_);
+      host_view_ = nullptr;
+    }
   }
 
   // CefDisplayHandler
@@ -122,6 +139,7 @@ class KomoCefClient : public CefClient,
   void* user_data_;
   KomoBrowserCallbacks cbs_;
   CefRefPtr<CefBrowser> browser_;
+  CFTypeRef host_view_ = nullptr;
 
   IMPLEMENT_REFCOUNTING(KomoCefClient);
 };
@@ -198,6 +216,7 @@ void* komo_cef_create_browser(void* nsview,
                               void* userData,
                               KomoBrowserCallbacks callbacks) {
   CefRefPtr<KomoCefClient> client(new KomoCefClient(userData, callbacks));
+  client->SetHostView(nsview);
 
   NSView* view = (__bridge NSView*)nsview;
   const NSRect b = [view bounds];
@@ -258,9 +277,17 @@ void komo_cef_stop_load(void* handle) {
   }
 }
 
+void komo_cef_set_focus(void* handle, bool focused) {
+  if (!handle) return;
+  if (CefRefPtr<CefBrowser> b = static_cast<KomoCefClient*>(handle)->browser()) {
+    b->GetHost()->SetFocus(focused);
+  }
+}
+
 void komo_cef_close_browser(void* handle) {
   if (!handle) return;
   auto* client = static_cast<KomoCefClient*>(handle);
+  client->ClearCallbacks();
   if (CefRefPtr<CefBrowser> b = client->browser()) {
     b->GetHost()->CloseBrowser(true);
   }

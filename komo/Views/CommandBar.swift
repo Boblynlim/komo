@@ -3,9 +3,9 @@ import SwiftUI
 struct CommandBar: View {
     @EnvironmentObject var tabManager: TabManager
     @EnvironmentObject var linkStore: LinkStore
+    @ObservedObject var selection: CommandBarSelection
     @Binding var isPresented: Bool
     @State private var query: String = ""
-    @State private var selectedIndex: Int = 0
     @State private var activeFolder: TabFolder? = nil
     @State private var activeLinkTag: String? = nil
     @FocusState private var isFocused: Bool
@@ -74,30 +74,7 @@ struct CommandBar: View {
 
             if !sections.isEmpty {
                 Divider()
-
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 0) {
-                        ForEach(sections) { section in
-                            if let label = section.label {
-                                Text(label)
-                                    .font(.system(size: 10, weight: .semibold))
-                                    .foregroundStyle(.tertiary)
-                                    .textCase(.uppercase)
-                                    .padding(.horizontal, 14)
-                                    .padding(.top, 8)
-                                    .padding(.bottom, 4)
-                            }
-
-                            ForEach(Array(section.items.enumerated()), id: \.offset) { itemIndex, result in
-                                let globalIndex = globalIndexOf(section: section, itemIndex: itemIndex)
-                                CommandResultRow(result: result, isSelected: globalIndex == selectedIndex)
-                                    .onTapGesture { execute(result) }
-                            }
-                        }
-                    }
-                    .padding(.vertical, 4)
-                }
-                .frame(maxHeight: 360)
+                resultsList
             }
         }
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
@@ -105,19 +82,22 @@ struct CommandBar: View {
         .shadow(color: .black.opacity(0.25), radius: 20, y: 8)
         .frame(width: 480)
         .onAppear {
+            // Take keyboard focus away from the web page so the page underneath
+            // doesn't react to keys while the command bar is open.
+            tabManager.selectedTab?.setBrowserFocus(false)
             isFocused = true
-            selectedIndex = 0
+            selection.index = 0
+            selection.count = flatResults.count
+        }
+        .onDisappear {
+            tabManager.selectedTab?.setBrowserFocus(true)
         }
         .onChange(of: query) {
-            selectedIndex = 0
+            selection.index = 0
+            selection.count = flatResults.count
         }
-        .onKeyPress(.upArrow) {
-            selectedIndex = max(0, selectedIndex - 1)
-            return .handled
-        }
-        .onKeyPress(.downArrow) {
-            selectedIndex = min(flatResults.count - 1, selectedIndex + 1)
-            return .handled
+        .onChange(of: flatResults.count) { _, n in
+            selection.count = n
         }
         .onKeyPress(.escape) {
             if activeFolder != nil || activeLinkTag != nil {
@@ -136,6 +116,35 @@ struct CommandBar: View {
         }
     }
 
+    private var resultsList: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(sections) { section in
+                    if let label = section.label {
+                        Text(label)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                            .textCase(.uppercase)
+                            .padding(.horizontal, 14)
+                            .padding(.top, 8)
+                            .padding(.bottom, 4)
+                    }
+                    ForEach(Array(section.items.enumerated()), id: \.offset) { itemIndex, result in
+                        let globalIndex = globalIndexOf(section: section, itemIndex: itemIndex)
+                        Button {
+                            execute(result)
+                        } label: {
+                            CommandResultRow(result: result, isSelected: globalIndex == selection.index)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .padding(.vertical, 4)
+        }
+        .frame(maxHeight: 360)
+    }
+
     private var placeholder: String {
         if activeFolder != nil { return "Search in folder..." }
         if activeLinkTag != nil { return "Search in tag..." }
@@ -146,7 +155,7 @@ struct CommandBar: View {
         activeFolder = nil
         activeLinkTag = nil
         query = ""
-        selectedIndex = 0
+        selection.index = 0
     }
 
     // MARK: - Main results (no folder/tag selected)
@@ -262,8 +271,8 @@ struct CommandBar: View {
     }
 
     private func executeSelected() {
-        guard selectedIndex < flatResults.count else { return }
-        execute(flatResults[selectedIndex])
+        guard selection.index < flatResults.count else { return }
+        execute(flatResults[selection.index])
     }
 
     private func execute(_ result: CommandResult) {
@@ -280,12 +289,12 @@ struct CommandBar: View {
             activeFolder = folder
             activeLinkTag = nil
             query = ""
-            selectedIndex = 0
+            selection.index = 0
         case .linkTag(let tag):
             activeLinkTag = tag
             activeFolder = nil
             query = ""
-            selectedIndex = 0
+            selection.index = 0
         case .navigate(let input):
             let trimmed = input.trimmingCharacters(in: .whitespaces)
             let url: URL?
@@ -338,7 +347,7 @@ struct CommandResultRow: View {
                 if let subtitle = subtitle {
                     Text(subtitle)
                         .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
             }
@@ -360,7 +369,7 @@ struct CommandResultRow: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(isSelected ? Color.kPink.opacity(0.12) : .clear, in: RoundedRectangle(cornerRadius: 8))
+        .background(isSelected ? Color.kPink.opacity(0.28) : .clear, in: RoundedRectangle(cornerRadius: 8))
         .padding(.horizontal, 6)
         .padding(.vertical, 1)
         .contentShape(Rectangle())

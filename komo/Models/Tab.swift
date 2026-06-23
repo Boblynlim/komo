@@ -69,6 +69,7 @@ class Tab: Identifiable, ObservableObject {
     func goBack() { if let b = browser { komo_cef_go_back(b) } }
     func goForward() { if let b = browser { komo_cef_go_forward(b) } }
     func stopLoading() { if let b = browser { komo_cef_stop_load(b) } }
+    func setBrowserFocus(_ focused: Bool) { if let b = browser { komo_cef_set_focus(b, focused) } }
 
     func closeBrowser() {
         if let b = browser { komo_cef_close_browser(b) }

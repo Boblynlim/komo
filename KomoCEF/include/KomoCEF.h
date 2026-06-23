@@ -49,6 +49,9 @@ void komo_cef_go_back(void* browser);
 void komo_cef_go_forward(void* browser);
 void komo_cef_reload(void* browser);
 void komo_cef_stop_load(void* browser);
+// Give/take keyboard focus to/from the browser. Call with false when an
+// overlay (e.g. the command bar) opens so keys go to the app, not the page.
+void komo_cef_set_focus(void* browser, bool focused);
 void komo_cef_close_browser(void* browser);
 
 #ifdef __cplusplus
