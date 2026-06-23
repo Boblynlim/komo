@@ -31,14 +31,19 @@ fi
 echo "Bundling Chromium framework + helper…"
 cp -R "$CEF_FRAMEWORK" "$BUNDLE_DIR/Contents/Frameworks/"
 
-# Helper subprocess app (reuse the prebuilt one, renamed to "komo Helper").
-cp -R "$HELPER_SRC" "$BUNDLE_DIR/Contents/Frameworks/komo Helper.app"
-mv "$BUNDLE_DIR/Contents/Frameworks/komo Helper.app/Contents/MacOS/swiftcef Helper" \
-   "$BUNDLE_DIR/Contents/Frameworks/komo Helper.app/Contents/MacOS/komo Helper"
-/usr/libexec/PlistBuddy -c "Set :CFBundleExecutable 'komo Helper'" \
-   "$BUNDLE_DIR/Contents/Frameworks/komo Helper.app/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.komo.browser.helper" \
-   "$BUNDLE_DIR/Contents/Frameworks/komo Helper.app/Contents/Info.plist" 2>/dev/null || true
+# All 5 dedicated helper subprocess apps (Renderer/GPU/Plugin/Alerts + base),
+# renamed from the prebuilt swiftcef helpers. CEF auto-discovers them by name;
+# the renderer needs its own helper, so a single generic one isn't enough.
+HELPERS_SRC_DIR="$CEF_DIST/build/tests/swiftcef/Release"
+for variant in "" " (GPU)" " (Plugin)" " (Renderer)" " (Alerts)"; do
+    src="$HELPERS_SRC_DIR/swiftcef Helper${variant}.app"
+    dst="$BUNDLE_DIR/Contents/Frameworks/komo Helper${variant}.app"
+    cp -R "$src" "$dst"
+    mv "$dst/Contents/MacOS/swiftcef Helper${variant}" "$dst/Contents/MacOS/komo Helper${variant}"
+    /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable 'komo Helper${variant}'" "$dst/Contents/Info.plist"
+    idsuffix=$(echo "$variant" | tr -dc '[:alpha:]' | tr '[:upper:]' '[:lower:]')
+    /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.komo.browser.helper${idsuffix:+.$idsuffix}" "$dst/Contents/Info.plist" 2>/dev/null || true
+done
 
 # Create Info.plist
 cat > "$BUNDLE_DIR/Contents/Info.plist" << 'PLIST'
@@ -78,13 +83,9 @@ cat > "$BUNDLE_DIR/Contents/Info.plist" << 'PLIST'
 </plist>
 PLIST
 
-# --- Sign (ad-hoc, dev) — inner components first, then the app ---
+# --- Sign (ad-hoc, dev) — deep sign the whole bundle, like the prototype ---
 echo "Signing…"
-codesign --force --sign - --timestamp=none \
-    "$BUNDLE_DIR/Contents/Frameworks/Chromium Embedded Framework.framework" 2>/dev/null
-codesign --force --deep --sign - --timestamp=none \
-    "$BUNDLE_DIR/Contents/Frameworks/komo Helper.app" 2>/dev/null
-codesign --force --deep --sign - --timestamp=none "$BUNDLE_DIR" 2>/dev/null
+codesign --force --deep --sign - "$BUNDLE_DIR" 2>/dev/null
 
 echo "✓ Built ${BUNDLE_DIR}"
 echo "  Run with: open build/komo.app"

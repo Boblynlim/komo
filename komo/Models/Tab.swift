@@ -19,6 +19,9 @@ class Tab: Identifiable, ObservableObject {
 
     init(id: UUID = UUID()) {
         self.id = id
+        // CEF's accelerated surface composites into a CALayer — the host must
+        // be layer-backed or the rendered page won't be visible.
+        hostView.wantsLayer = true
     }
 
     /// Create the Chromium browser in `hostView`. Safe to call repeatedly.
@@ -30,10 +33,13 @@ class Tab: Identifiable, ObservableObject {
 
         let callbacks = KomoBrowserCallbacks(
             onTitleChange: { ud, v in
-                Tab.onMain(ud) { $0.title = v.map { String(cString: $0) } ?? "" }
+                // Copy the C string to a Swift String now — it's freed when this returns.
+                let s = v.map { String(cString: $0) } ?? ""
+                Tab.onMain(ud) { $0.title = s }
             },
             onURLChange: { ud, v in
-                Tab.onMain(ud) { $0.url = v.flatMap { URL(string: String(cString: $0)) } }
+                let s = v.map { String(cString: $0) }
+                Tab.onMain(ud) { $0.url = s.flatMap { URL(string: $0) } }
             },
             onLoadingChange: { ud, v in Tab.onMain(ud) { $0.isLoading = v } },
             onCanGoBackChange: { ud, v in Tab.onMain(ud) { $0.canGoBack = v } },

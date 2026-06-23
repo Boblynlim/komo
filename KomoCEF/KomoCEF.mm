@@ -54,18 +54,6 @@ class KomoCefApp : public CefApp, public CefBrowserProcessHandler {
     return this;
   }
 
-  void OnScheduleMessagePumpWork(int64_t delay_ms) override {
-    if (delay_ms < 0) {
-      delay_ms = 0;
-    }
-    // Pump CEF work on the main thread after the requested delay.
-    dispatch_after(
-        dispatch_time(DISPATCH_TIME_NOW, delay_ms * NSEC_PER_MSEC),
-        dispatch_get_main_queue(), ^{
-          CefDoMessageLoopWork();
-        });
-  }
-
  private:
   IMPLEMENT_REFCOUNTING(KomoCefApp);
 };
@@ -86,6 +74,10 @@ class KomoCefClient : public CefClient,
   // CefLifeSpanHandler
   void OnAfterCreated(CefRefPtr<CefBrowser> browser) override {
     browser_ = browser;
+    // When embedded in SwiftUI's hosting layer, CEF can think the browser is
+    // hidden/occluded and skip painting. Force it visible + lay it out.
+    browser->GetHost()->WasHidden(false);
+    browser->GetHost()->WasResized();
   }
   void OnBeforeClose(CefRefPtr<CefBrowser> browser) override {
     browser_ = nullptr;
@@ -155,8 +147,9 @@ bool komo_cef_initialize(void) {
   CefMainArgs main_args(0, nullptr);
 
   CefSettings settings;
-  settings.external_message_pump = true;
   settings.no_sandbox = true;
+  // We drive CefDoMessageLoopWork from a timer below (see end of this function),
+  // which is more reliable here than external_message_pump.
 
   // komo-specific cache dir, so CEF's process singleton is well-defined
   // (the default is shared and collides with other CEF apps/instances).
@@ -172,12 +165,28 @@ bool komo_cef_initialize(void) {
           "/Contents/Frameworks/Chromium Embedded Framework.framework"));
   CefString(&settings.main_bundle_path)
       .FromString(std::string([[[NSBundle mainBundle] bundlePath] UTF8String]));
-  CefString(&settings.browser_subprocess_path)
-      .FromString(BundleSubPath(
-          "/Contents/Frameworks/komo Helper.app/Contents/MacOS/komo Helper"));
+  // Leave browser_subprocess_path unset: CEF auto-discovers the dedicated
+  // helper apps ("komo Helper (Renderer).app" etc.) in Contents/Frameworks.
+  // The renderer needs its dedicated helper — a single generic helper makes
+  // the renderer fail to launch (navigation aborts, blank page).
 
   CefRefPtr<KomoCefApp> app(new KomoCefApp);
-  return CefInitialize(main_args, settings, app.get(), nullptr);
+  if (!CefInitialize(main_args, settings, app.get(), nullptr)) {
+    return false;
+  }
+
+  // Drive the CEF message loop from a 60 Hz main-thread timer so browsers
+  // actually load and paint.
+  static dispatch_source_t s_pump = dispatch_source_create(
+      DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
+  dispatch_source_set_timer(s_pump, DISPATCH_TIME_NOW,
+                            (uint64_t)(NSEC_PER_SEC / 60),
+                            (uint64_t)(NSEC_PER_MSEC));
+  dispatch_source_set_event_handler(s_pump, ^{
+    CefDoMessageLoopWork();
+  });
+  dispatch_resume(s_pump);
+  return true;
 }
 
 void komo_cef_shutdown(void) {
@@ -192,8 +201,6 @@ void* komo_cef_create_browser(void* nsview,
 
   NSView* view = (__bridge NSView*)nsview;
   const NSRect b = [view bounds];
-  NSLog(@"komo: create_browser url=%s view=%p size=%.0fx%.0f", url ? url : "(null)",
-        nsview, b.size.width, b.size.height);
 
   CefWindowInfo window_info;
   CefRect bounds(0, 0, static_cast<int>(b.size.width),
@@ -202,11 +209,9 @@ void* komo_cef_create_browser(void* nsview,
   window_info.runtime_style = CEF_RUNTIME_STYLE_ALLOY;
 
   CefBrowserSettings browser_settings;
-  bool ok = CefBrowserHost::CreateBrowser(window_info, client,
-                                          std::string(url ? url : "about:blank"),
-                                          browser_settings, nullptr, nullptr);
-  NSLog(@"komo: CefBrowserHost::CreateBrowser -> %d", ok);
-  if (!ok) {
+  if (!CefBrowserHost::CreateBrowser(window_info, client,
+                                     std::string(url ? url : "about:blank"),
+                                     browser_settings, nullptr, nullptr)) {
     return nullptr;
   }
 
