@@ -166,6 +166,9 @@ bool komo_cef_initialize(void) {
 
   CefSettings settings;
   settings.no_sandbox = true;
+  // We bundle only the English Chromium UI locale (see bundle.sh) — pin the
+  // locale so CEF never looks for a pruned locale.pak.
+  CefString(&settings.locale).FromString("en-US");
 
   // komo-specific cache dir, so CEF's process singleton is well-defined
   // (the default is shared and collides with other CEF apps/instances).

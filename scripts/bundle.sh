@@ -31,6 +31,20 @@ fi
 echo "Bundling Chromium framework + helper…"
 cp -R "$CEF_FRAMEWORK" "$BUNDLE_DIR/Contents/Frameworks/"
 
+# Trim Chromium's built-in UI locales to English only (~49MB saved). komo's
+# chrome is custom SwiftUI, so these .pak files only back web context menus,
+# form pickers, the PDF viewer and net-error pages — all fine in English.
+# Web page content itself is unaffected. KomoCEF pins settings.locale=en-US so
+# CEF never looks for a pruned locale.
+echo "Trimming Chromium locales to English…"
+CEF_RES="$BUNDLE_DIR/Contents/Frameworks/Chromium Embedded Framework.framework/Resources"
+for lproj in "$CEF_RES"/*.lproj; do
+    case "$lproj" in
+        */en.lproj) ;;            # keep English
+        *) rm -rf "$lproj" ;;
+    esac
+done
+
 # All 5 dedicated helper subprocess apps (Renderer/GPU/Plugin/Alerts + base),
 # renamed from the prebuilt swiftcef helpers. CEF auto-discovers them by name;
 # the renderer needs its own helper, so a single generic one isn't enough.
