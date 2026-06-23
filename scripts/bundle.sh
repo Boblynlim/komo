@@ -2,7 +2,7 @@
 set -e
 
 APP_NAME="komo"
-BUILD_DIR=".build/arm64-apple-macosx/debug"
+BUILD_DIR=".build/arm64-apple-macosx/release"
 BUNDLE_DIR="build/${APP_NAME}.app"
 
 # CEF SDK (downloaded separately; see cef-prototype/README.md).
@@ -10,8 +10,8 @@ CEF_DIST="/Users/jazulynn/src/tries/browser/cef-proof/cef"
 CEF_FRAMEWORK="$CEF_DIST/Release/Chromium Embedded Framework.framework"
 HELPER_SRC="$CEF_DIST/build/tests/swiftcef/Release/swiftcef Helper.app"
 
-# Build first
-swift build
+# Build first (optimized release)
+swift build -c release
 
 # Create .app bundle structure
 rm -rf "$BUNDLE_DIR"
