@@ -359,12 +359,19 @@ struct SidebarTabRow: View {
                     .frame(width: 16, height: 16)
             } else {
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(.quaternary)
+                    .fill(tab.favicon == nil ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear))
                     .frame(width: 16, height: 16)
                     .overlay {
                         if tab.isLoading {
                             ProgressView()
                                 .scaleEffect(0.4)
+                        } else if let favicon = tab.favicon {
+                            Image(nsImage: favicon)
+                                .resizable()
+                                .interpolation(.high)
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 15, height: 15)
+                                .clipShape(RoundedRectangle(cornerRadius: 3))
                         } else {
                             Image(systemName: "globe")
                                 .font(.system(size: 9))

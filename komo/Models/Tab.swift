@@ -11,6 +11,7 @@ class Tab: Identifiable, ObservableObject {
 
     @Published var title: String = "New Tab"
     @Published var url: URL?
+    @Published var favicon: NSImage?
     @Published var isLoading: Bool = false
     @Published var canGoBack: Bool = false
     @Published var canGoForward: Bool = false
@@ -43,7 +44,19 @@ class Tab: Identifiable, ObservableObject {
             },
             onLoadingChange: { ud, v in Tab.onMain(ud) { $0.isLoading = v } },
             onCanGoBackChange: { ud, v in Tab.onMain(ud) { $0.canGoBack = v } },
-            onCanGoForwardChange: { ud, v in Tab.onMain(ud) { $0.canGoForward = v } }
+            onCanGoForwardChange: { ud, v in Tab.onMain(ud) { $0.canGoForward = v } },
+            onFaviconChange: { ud, data, len in
+                // Copy the PNG bytes now — the buffer is freed when this returns.
+                guard let data, len > 0 else { return }
+                let bytes = Data(bytes: data, count: Int(len))
+                Tab.onMain(ud) { tab in
+                    guard let image = NSImage(data: bytes) else { return }
+                    tab.favicon = image
+                    if let host = tab.url?.host {
+                        FaviconStore.shared.set(image, forHost: host)
+                    }
+                }
+            }
         )
         browser = komo_cef_create_browser(viewPtr, initial, userData, callbacks)
         pendingURL = nil
