@@ -5,7 +5,7 @@ struct BrowserWindow: View {
     @EnvironmentObject var linkStore: LinkStore
     @State private var showSavePanel = false
     @State private var showLinkLibrary = false
-    @State private var showCommandBar = false
+    @State private var showPulse = false
 
     var body: some View {
         NavigationSplitView(columnVisibility: .init(
@@ -15,7 +15,10 @@ struct BrowserWindow: View {
             SidebarView()
                 .navigationSplitViewColumnWidth(min: 140, ideal: 180, max: 280)
         } detail: {
-            if showLinkLibrary {
+            if showPulse {
+                PulseView()
+                    .toolbar { browserToolbar }
+            } else if showLinkLibrary {
                 LinkLibraryView()
                     .toolbar { browserToolbar }
             } else {
@@ -50,26 +53,28 @@ struct BrowserWindow: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .toggleLinkLibrary)) { _ in
             showLinkLibrary.toggle()
+            if showLinkLibrary { showPulse = false }
         }
         .overlay(alignment: .bottomTrailing) {
             DownloadPopupCard()
                 .padding(16)
         }
-        .overlay {
-            if showCommandBar {
-                Color.black.opacity(0.3)
-                    .ignoresSafeArea()
-                    .onTapGesture { showCommandBar = false }
-
-                VStack {
-                    CommandBar(isPresented: $showCommandBar)
-                        .padding(.top, 80)
-                    Spacer()
-                }
-            }
-        }
         .onReceive(NotificationCenter.default.publisher(for: .toggleCommandBar)) { _ in
-            showCommandBar.toggle()
+            CommandBarController.shared.toggle()
+        }
+        .onAppear {
+            // The command bar lives in its own floating key window (NSPanel),
+            // not a same-window overlay — an embedded CEF view would otherwise
+            // swallow all of its mouse/keyboard input.
+            CommandBarController.shared.configure(tabManager: tabManager, linkStore: linkStore)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .togglePulse)) { _ in
+            showPulse.toggle()
+            if showPulse { showLinkLibrary = false }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .dismissOverlays)) { _ in
+            showPulse = false
+            showLinkLibrary = false
         }
     }
 

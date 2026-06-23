@@ -16,7 +16,7 @@ struct SaveLinkPanel: View {
             // Header
             HStack {
                 Image(systemName: "bookmark.fill")
-                    .foregroundStyle(.purple)
+                    .foregroundStyle(.kPink)
                 Text("Save Link")
                     .font(.system(size: 14, weight: .semibold))
                 Spacer()
@@ -57,8 +57,8 @@ struct SaveLinkPanel: View {
                             }
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
-                            .background(.purple.opacity(0.15), in: Capsule())
-                            .foregroundStyle(.purple)
+                            .background(.kPink.opacity(0.15), in: Capsule())
+                            .foregroundStyle(.kPink)
                         }
                     }
                 }
@@ -110,7 +110,7 @@ struct SaveLinkPanel: View {
                 Button("Save") { saveLink() }
                     .keyboardShortcut(.defaultAction)
                     .buttonStyle(.borderedProminent)
-                    .tint(.purple)
+                    .tint(.kPink)
             }
         }
         .padding(16)
@@ -130,6 +130,7 @@ struct SaveLinkPanel: View {
     }
 
     private func saveLink() {
+        addTag() // capture any pending tag input
         linkStore.save(url: url, title: editTitle, tags: tags, notes: notes)
         isPresented = false
     }

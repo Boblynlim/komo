@@ -4,19 +4,34 @@ struct NavButtons: View {
     @EnvironmentObject var tabManager: TabManager
 
     var body: some View {
+        if let tab = tabManager.selectedTab {
+            NavButtonsInner(tab: tab)
+        } else {
+            HStack(spacing: 2) {
+                NavButton(icon: "chevron.left", enabled: false) {}
+                NavButton(icon: "chevron.right", enabled: false) {}
+                NavButton(icon: "arrow.clockwise", enabled: false) {}
+            }
+        }
+    }
+}
+
+struct NavButtonsInner: View {
+    @ObservedObject var tab: Tab
+
+    var body: some View {
         HStack(spacing: 2) {
-            NavButton(icon: "chevron.left", enabled: tabManager.selectedTab?.canGoBack ?? false) {
-                tabManager.selectedTab?.goBack()
+            NavButton(icon: "chevron.left", enabled: tab.canGoBack) {
+                tab.goBack()
             }
-            NavButton(icon: "chevron.right", enabled: tabManager.selectedTab?.canGoForward ?? false) {
-                tabManager.selectedTab?.goForward()
+            NavButton(icon: "chevron.right", enabled: tab.canGoForward) {
+                tab.goForward()
             }
-            NavButton(icon: tabManager.selectedTab?.isLoading == true ? "xmark" : "arrow.clockwise",
-                      enabled: true) {
-                if tabManager.selectedTab?.isLoading == true {
-                    tabManager.selectedTab?.webView.stopLoading()
+            NavButton(icon: tab.isLoading ? "xmark" : "arrow.clockwise", enabled: true) {
+                if tab.isLoading {
+                    tab.stopLoading()
                 } else {
-                    tabManager.selectedTab?.reload()
+                    tab.reload()
                 }
             }
         }

@@ -42,6 +42,11 @@ struct BrowserCommands: Commands {
                 NotificationCenter.default.post(name: .toggleCommandBar, object: nil)
             }
             .keyboardShortcut("k", modifiers: .command)
+
+            Button("Scout") {
+                NotificationCenter.default.post(name: .togglePulse, object: nil)
+            }
+            .keyboardShortcut("p", modifiers: [.command, .shift])
         }
 
         CommandGroup(after: .sidebar) {
@@ -58,4 +63,6 @@ extension Notification.Name {
     static let saveCurrentLink = Notification.Name("saveCurrentLink")
     static let toggleLinkLibrary = Notification.Name("toggleLinkLibrary")
     static let toggleCommandBar = Notification.Name("toggleCommandBar")
+    static let togglePulse = Notification.Name("togglePulse")
+    static let dismissOverlays = Notification.Name("dismissOverlays")
 }

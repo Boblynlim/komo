@@ -3,9 +3,9 @@ import SwiftUI
 struct CommandBar: View {
     @EnvironmentObject var tabManager: TabManager
     @EnvironmentObject var linkStore: LinkStore
+    @ObservedObject var selection: CommandBarSelection
     @Binding var isPresented: Bool
     @State private var query: String = ""
-    @State private var selectedIndex: Int = 0
     @State private var activeFolder: TabFolder? = nil
     @State private var activeLinkTag: String? = nil
     @FocusState private var isFocused: Bool
@@ -44,20 +44,20 @@ struct CommandBar: View {
                 if let folder = activeFolder {
                     Text(folder.name)
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.purple)
+                        .foregroundStyle(.kPink)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(.purple.opacity(0.1), in: Capsule())
+                        .background(.kPink.opacity(0.1), in: Capsule())
                     Text("/")
                         .font(.system(size: 12))
                         .foregroundStyle(.quaternary)
                 } else if let tag = activeLinkTag {
                     Text("#\(tag)")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.purple)
+                        .foregroundStyle(.kPink)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(.purple.opacity(0.1), in: Capsule())
+                        .background(.kPink.opacity(0.1), in: Capsule())
                     Text("/")
                         .font(.system(size: 12))
                         .foregroundStyle(.quaternary)
@@ -74,30 +74,7 @@ struct CommandBar: View {
 
             if !sections.isEmpty {
                 Divider()
-
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 0) {
-                        ForEach(sections) { section in
-                            if let label = section.label {
-                                Text(label)
-                                    .font(.system(size: 10, weight: .semibold))
-                                    .foregroundStyle(.tertiary)
-                                    .textCase(.uppercase)
-                                    .padding(.horizontal, 14)
-                                    .padding(.top, 8)
-                                    .padding(.bottom, 4)
-                            }
-
-                            ForEach(Array(section.items.enumerated()), id: \.offset) { itemIndex, result in
-                                let globalIndex = globalIndexOf(section: section, itemIndex: itemIndex)
-                                CommandResultRow(result: result, isSelected: globalIndex == selectedIndex)
-                                    .onTapGesture { execute(result) }
-                            }
-                        }
-                    }
-                    .padding(.vertical, 4)
-                }
-                .frame(maxHeight: 360)
+                resultsList
             }
         }
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
@@ -105,19 +82,36 @@ struct CommandBar: View {
         .shadow(color: .black.opacity(0.25), radius: 20, y: 8)
         .frame(width: 480)
         .onAppear {
+            // Take keyboard focus away from the web page so the page underneath
+            // doesn't react to keys while the command bar is open.
+            tabManager.selectedTab?.setBrowserFocus(false)
             isFocused = true
-            selectedIndex = 0
+            selection.count = flatResults.count
+            // Start on the tab you're currently viewing, if it's in the list.
+            if let current = tabManager.selectedTab,
+               let idx = flatResults.firstIndex(where: { result in
+                   if case .tab(let t) = result { return t.id == current.id }
+                   return false
+               }) {
+                selection.index = idx
+            } else {
+                selection.index = 0
+            }
+        }
+        .onDisappear {
+            tabManager.selectedTab?.setBrowserFocus(true)
         }
         .onChange(of: query) {
-            selectedIndex = 0
+            selection.index = 0
+            selection.count = flatResults.count
         }
-        .onKeyPress(.upArrow) {
-            selectedIndex = max(0, selectedIndex - 1)
-            return .handled
+        .onChange(of: flatResults.count) { _, n in
+            selection.count = n
         }
-        .onKeyPress(.downArrow) {
-            selectedIndex = min(flatResults.count - 1, selectedIndex + 1)
-            return .handled
+        .onChange(of: selection.index) {
+            // Arrow/Tab nav goes through an app-level monitor, which can steal
+            // focus from the field — re-assert it so typing + Enter keep working.
+            isFocused = true
         }
         .onKeyPress(.escape) {
             if activeFolder != nil || activeLinkTag != nil {
@@ -136,6 +130,47 @@ struct CommandBar: View {
         }
     }
 
+    private var resultsList: some View {
+        // Single snapshot of the sections so row indices are consistent (the
+        // `sections` computed property mints fresh ids on every access).
+        let secs = sections
+        return ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(secs.enumerated()), id: \.offset) { sectionIdx, section in
+                        if let label = section.label {
+                            Text(label)
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                                .textCase(.uppercase)
+                                .padding(.horizontal, 14)
+                                .padding(.top, 8)
+                                .padding(.bottom, 4)
+                        }
+                        let base = secs.prefix(sectionIdx).reduce(0) { $0 + $1.items.count }
+                        ForEach(Array(section.items.enumerated()), id: \.offset) { itemIndex, result in
+                            Button {
+                                execute(result)
+                            } label: {
+                                CommandResultRow(result: result, isSelected: base + itemIndex == selection.index)
+                            }
+                            .buttonStyle(.plain)
+                            .id(base + itemIndex)
+                        }
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+            .frame(maxHeight: 360)
+            .onChange(of: selection.index) { _, idx in
+                // Keep the highlighted row scrolled into view.
+                withAnimation(.easeOut(duration: 0.12)) {
+                    proxy.scrollTo(idx, anchor: .center)
+                }
+            }
+        }
+    }
+
     private var placeholder: String {
         if activeFolder != nil { return "Search in folder..." }
         if activeLinkTag != nil { return "Search in tag..." }
@@ -146,7 +181,7 @@ struct CommandBar: View {
         activeFolder = nil
         activeLinkTag = nil
         query = ""
-        selectedIndex = 0
+        selection.index = 0
     }
 
     // MARK: - Main results (no folder/tag selected)
@@ -162,7 +197,7 @@ struct CommandBar: View {
         if !matchingTabs.isEmpty {
             sections.append(CommandSection(
                 label: "Open Tabs",
-                items: matchingTabs.prefix(5).map { .tab($0) }
+                items: matchingTabs.map { .tab($0) }
             ))
         }
 
@@ -262,8 +297,8 @@ struct CommandBar: View {
     }
 
     private func executeSelected() {
-        guard selectedIndex < flatResults.count else { return }
-        execute(flatResults[selectedIndex])
+        guard selection.index < flatResults.count else { return }
+        execute(flatResults[selection.index])
     }
 
     private func execute(_ result: CommandResult) {
@@ -280,12 +315,12 @@ struct CommandBar: View {
             activeFolder = folder
             activeLinkTag = nil
             query = ""
-            selectedIndex = 0
+            selection.index = 0
         case .linkTag(let tag):
             activeLinkTag = tag
             activeFolder = nil
             query = ""
-            selectedIndex = 0
+            selection.index = 0
         case .navigate(let input):
             let trimmed = input.trimmingCharacters(in: .whitespaces)
             let url: URL?
@@ -338,7 +373,7 @@ struct CommandResultRow: View {
                 if let subtitle = subtitle {
                     Text(subtitle)
                         .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
             }
@@ -360,7 +395,7 @@ struct CommandResultRow: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(isSelected ? Color.purple.opacity(0.12) : .clear, in: RoundedRectangle(cornerRadius: 8))
+        .background(isSelected ? Color.kPink.opacity(0.30) : .clear, in: RoundedRectangle(cornerRadius: 8))
         .padding(.horizontal, 6)
         .padding(.vertical, 1)
         .contentShape(Rectangle())
@@ -379,7 +414,7 @@ struct CommandResultRow: View {
     private var iconColor: Color {
         switch result {
         case .folder: return .blue
-        case .linkTag: return .purple
+        case .linkTag: return .kPink
         default: return .secondary
         }
     }
