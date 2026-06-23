@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct LinkLibraryView: View {
     @EnvironmentObject var linkStore: LinkStore
@@ -9,6 +10,16 @@ struct LinkLibraryView: View {
     @State private var selectedIDs: Set<UUID> = []
     @State private var showBatchTag = false
     @State private var batchTagInput = ""
+    // Keyboard navigation through the link list (↑/↓ to move, ⏎ to open).
+    @State private var keyboardIndex = -1
+    @State private var keyMonitor: Any?
+
+    // The link currently highlighted by the keyboard, if any.
+    private var keyboardSelectedID: UUID? {
+        let links = linkStore.filteredLinks
+        guard keyboardIndex >= 0, keyboardIndex < links.count else { return nil }
+        return links[keyboardIndex].id
+    }
 
     var body: some View {
         HSplitView {
@@ -23,6 +34,53 @@ struct LinkLibraryView: View {
                 }
                 linkList
             }
+        }
+        .onAppear { installKeyMonitor() }
+        .onDisappear { removeKeyMonitor() }
+        .onChange(of: linkStore.filter) { keyboardIndex = -1 }
+        .onChange(of: linkStore.searchQuery) { keyboardIndex = -1 }
+    }
+
+    // MARK: - Keyboard navigation
+
+    private func installKeyMonitor() {
+        guard keyMonitor == nil else { return }
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            // Don't hijack arrows/⏎ while the user is editing a text field
+            // (search box, tag rename, etc.).
+            if let responder = NSApp.keyWindow?.firstResponder,
+               responder is NSTextView {
+                return event
+            }
+            let links = linkStore.filteredLinks
+            guard !links.isEmpty else { return event }
+            switch event.keyCode {
+            case 125: // down arrow
+                keyboardIndex = min(links.count - 1, keyboardIndex + 1)
+                return nil
+            case 126: // up arrow
+                keyboardIndex = max(0, keyboardIndex - 1)
+                return nil
+            case 36, 76: // return / enter
+                guard keyboardIndex >= 0, keyboardIndex < links.count else { return event }
+                openLink(links[keyboardIndex])
+                return nil
+            default:
+                return event
+            }
+        }
+    }
+
+    private func removeKeyMonitor() {
+        if let keyMonitor {
+            NSEvent.removeMonitor(keyMonitor)
+            self.keyMonitor = nil
+        }
+    }
+
+    private func openLink(_ link: SavedLink) {
+        if let url = URL(string: link.url), let tab = tabManager.selectedTab {
+            tab.load(url)
         }
     }
 
@@ -311,21 +369,32 @@ struct LinkLibraryView: View {
             if linkStore.filteredLinks.isEmpty {
                 emptyState
             } else {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0, pinnedViews: .sectionHeaders) {
-                        ForEach(linkStore.groupedLinks, id: \.0) { dateLabel, links in
-                            Section {
-                                ForEach(links) { link in
-                                    LinkRow(link: link, isSelecting: $isSelecting, selectedIDs: $selectedIDs)
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 0, pinnedViews: .sectionHeaders) {
+                            ForEach(linkStore.groupedLinks, id: \.0) { dateLabel, links in
+                                Section {
+                                    ForEach(links) { link in
+                                        LinkRow(link: link, isSelecting: $isSelecting, selectedIDs: $selectedIDs,
+                                                isKeyboardSelected: link.id == keyboardSelectedID)
+                                            .id(link.id)
+                                    }
+                                } header: {
+                                    Text(dateLabel)
+                                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                        .foregroundStyle(.secondary)
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 6)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .background(.bar)
                                 }
-                            } header: {
-                                Text(dateLabel)
-                                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(.secondary)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 6)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .background(.bar)
+                            }
+                        }
+                    }
+                    .onChange(of: keyboardIndex) {
+                        if let id = keyboardSelectedID {
+                            withAnimation(.easeOut(duration: 0.12)) {
+                                proxy.scrollTo(id, anchor: .center)
                             }
                         }
                     }
@@ -368,12 +437,14 @@ struct NavItem: View {
                     .frame(width: 16)
                 Text(label)
                     .font(.system(size: 13, weight: isSelected ? .medium : .regular))
-                Spacer()
+                Spacer(minLength: 0)
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(isSelected ? Color.kPink.opacity(0.12) : .clear, in: RoundedRectangle(cornerRadius: 6))
             .foregroundStyle(isSelected ? .primary : .secondary)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -408,12 +479,14 @@ struct TagNavItem: View {
                         .font(.system(size: 13, weight: isSelected ? .medium : .regular))
                 }
 
-                Spacer()
+                Spacer(minLength: 0)
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(isSelected ? Color.kPink.opacity(0.1) : .clear, in: RoundedRectangle(cornerRadius: 6))
             .foregroundStyle(isSelected ? .primary : .secondary)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .contextMenu {
@@ -432,6 +505,7 @@ struct LinkRow: View {
     let link: SavedLink
     @Binding var isSelecting: Bool
     @Binding var selectedIDs: Set<UUID>
+    var isKeyboardSelected: Bool = false
     @EnvironmentObject var linkStore: LinkStore
     @EnvironmentObject var tabManager: TabManager
     @State private var isHovering = false
@@ -439,6 +513,16 @@ struct LinkRow: View {
     @State private var tagInput = ""
 
     var isSelected: Bool { selectedIDs.contains(link.id) }
+
+    @ViewBuilder private var rowBackground: some View {
+        if isKeyboardSelected {
+            Color.kPink.opacity(0.12)
+        } else if isHovering {
+            Color.primary.opacity(0.04)
+        } else {
+            Color.clear
+        }
+    }
 
     var body: some View {
         HStack(spacing: 10) {
@@ -526,7 +610,7 @@ struct LinkRow: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
-        .background(isHovering ? Color.primary.opacity(0.04) : .clear)
+        .background(rowBackground)
         .contentShape(Rectangle())
         .onTapGesture {
             if isSelecting {

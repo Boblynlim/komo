@@ -166,8 +166,6 @@ bool komo_cef_initialize(void) {
 
   CefSettings settings;
   settings.no_sandbox = true;
-  // We drive CefDoMessageLoopWork from a timer below (see end of this function),
-  // which is more reliable here than external_message_pump.
 
   // komo-specific cache dir, so CEF's process singleton is well-defined
   // (the default is shared and collides with other CEF apps/instances).
@@ -193,8 +191,8 @@ bool komo_cef_initialize(void) {
     return false;
   }
 
-  // Drive the CEF message loop from a 60 Hz main-thread timer so browsers
-  // actually load and paint.
+  // CEF owns no run loop of its own here — pump it from a main-thread timer so
+  // browsers actually paint. ~60Hz keeps rendering smooth.
   static dispatch_source_t s_pump = dispatch_source_create(
       DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
   dispatch_source_set_timer(s_pump, DISPATCH_TIME_NOW,
