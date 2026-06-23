@@ -508,6 +508,7 @@ struct LinkRow: View {
     var isKeyboardSelected: Bool = false
     @EnvironmentObject var linkStore: LinkStore
     @EnvironmentObject var tabManager: TabManager
+    @ObservedObject private var favicons = FaviconStore.shared
     @State private var isHovering = false
     @State private var showTagPopover = false
     @State private var tagInput = ""
@@ -530,8 +531,15 @@ struct LinkRow: View {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 14))
                     .foregroundStyle(isSelected ? .kPink : .secondary)
+            } else if let favicon = favicons.icon(forURLString: link.url) {
+                Image(nsImage: favicon)
+                    .resizable()
+                    .interpolation(.high)
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 20, height: 20)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
             } else {
-                // Favicon placeholder
+                // Favicon placeholder (no cached icon for this host yet)
                 RoundedRectangle(cornerRadius: 4)
                     .fill(.quaternary)
                     .frame(width: 20, height: 20)

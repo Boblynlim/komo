@@ -24,10 +24,20 @@ bool komo_cef_initialize(void);
 // Shut CEF down (call on app termination).
 void komo_cef_shutdown(void);
 
+// Set the global ad/tracker blocklist. Any network request whose host equals,
+// or is a subdomain of, one of `domains` is cancelled. Replaces any previous
+// list; pass count 0 to disable. Safe to call from the main thread at any time.
+void komo_cef_set_blocklist(const char* const* domains, int count);
+
 // Per-browser callbacks back into Swift. `userData` is the opaque pointer
 // passed to komo_cef_create_browser (komo passes the Tab).
 typedef void (*KomoStringCallback)(void* userData, const char* value);
 typedef void (*KomoBoolCallback)(void* userData, bool value);
+// Favicon delivered as encoded PNG bytes. Copy synchronously — the buffer is
+// freed when the callback returns.
+typedef void (*KomoFaviconCallback)(void* userData,
+                                    const unsigned char* pngData,
+                                    int length);
 
 typedef struct {
   KomoStringCallback onTitleChange;
@@ -35,6 +45,7 @@ typedef struct {
   KomoBoolCallback onLoadingChange;
   KomoBoolCallback onCanGoBackChange;
   KomoBoolCallback onCanGoForwardChange;
+  KomoFaviconCallback onFaviconChange;
 } KomoBrowserCallbacks;
 
 // Create a Chromium browser parented into `nsview`, loading `url`.

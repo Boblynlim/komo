@@ -2,7 +2,10 @@
 
 #import <Cocoa/Cocoa.h>
 
+#include <mutex>
 #include <string>
+#include <unordered_set>
+#include <vector>
 
 #include "KomoCEF.h"
 
@@ -10,6 +13,10 @@
 #include "include/cef_application_mac.h"
 #include "include/cef_browser.h"
 #include "include/cef_client.h"
+#include "include/cef_image.h"
+#include "include/cef_parser.h"
+#include "include/cef_request_handler.h"
+#include "include/cef_resource_request_handler.h"
 #include "include/cef_version.h"
 #include "include/wrapper/cef_library_loader.h"
 
@@ -46,6 +53,51 @@ const char* komo_cef_version(void) {
 // ---------------------------------------------------------------------------
 namespace {
 
+// ---------------------------------------------------------------------------
+// Ad/tracker blocklist. Written from the main thread (komo_cef_set_blocklist),
+// read on CEF's IO thread (OnBeforeResourceLoad) — guarded by a mutex.
+// ---------------------------------------------------------------------------
+std::mutex g_blocklist_mtx;
+std::unordered_set<std::string> g_blocklist;
+
+// True if `host` equals, or is a subdomain of, any blocked domain. Walks the
+// host's parent domains ("a.b.example.com" -> "b.example.com" -> ...).
+bool IsBlockedHost(const std::string& host) {
+  std::lock_guard<std::mutex> lock(g_blocklist_mtx);
+  if (g_blocklist.empty()) {
+    return false;
+  }
+  std::string h = host;
+  while (true) {
+    if (g_blocklist.count(h)) {
+      return true;
+    }
+    const size_t dot = h.find('.');
+    if (dot == std::string::npos) {
+      break;
+    }
+    h = h.substr(dot + 1);
+  }
+  return false;
+}
+
+class KomoCefClient;
+
+// Receives a downloaded favicon image and hands it to its client. Holds a
+// strong ref so the client outlives the async download.
+class FaviconDownloadCallback : public CefDownloadImageCallback {
+ public:
+  explicit FaviconDownloadCallback(CefRefPtr<KomoCefClient> client)
+      : client_(client) {}
+  void OnDownloadImageFinished(const CefString& image_url,
+                               int http_status_code,
+                               CefRefPtr<CefImage> image) override;
+
+ private:
+  CefRefPtr<KomoCefClient> client_;
+  IMPLEMENT_REFCOUNTING(FaviconDownloadCallback);
+};
+
 class KomoCefApp : public CefApp, public CefBrowserProcessHandler {
  public:
   KomoCefApp() = default;
@@ -62,7 +114,9 @@ class KomoCefApp : public CefApp, public CefBrowserProcessHandler {
 class KomoCefClient : public CefClient,
                       public CefDisplayHandler,
                       public CefLoadHandler,
-                      public CefLifeSpanHandler {
+                      public CefLifeSpanHandler,
+                      public CefRequestHandler,
+                      public CefResourceRequestHandler {
  public:
   KomoCefClient(void* user_data, KomoBrowserCallbacks cbs)
       : user_data_(user_data), cbs_(cbs) {}
@@ -83,6 +137,57 @@ class KomoCefClient : public CefClient,
   CefRefPtr<CefDisplayHandler> GetDisplayHandler() override { return this; }
   CefRefPtr<CefLoadHandler> GetLoadHandler() override { return this; }
   CefRefPtr<CefLifeSpanHandler> GetLifeSpanHandler() override { return this; }
+  CefRefPtr<CefRequestHandler> GetRequestHandler() override { return this; }
+
+  // CefRequestHandler — supply ourselves as the resource handler for every
+  // request so we can filter (ad/tracker blocking).
+  CefRefPtr<CefResourceRequestHandler> GetResourceRequestHandler(
+      CefRefPtr<CefBrowser> browser,
+      CefRefPtr<CefFrame> frame,
+      CefRefPtr<CefRequest> request,
+      bool is_navigation,
+      bool is_download,
+      const CefString& request_initiator,
+      bool& disable_default_handling) override {
+    return this;
+  }
+
+  // CefResourceRequestHandler — cancel blocked hosts before they hit the net.
+  cef_return_value_t OnBeforeResourceLoad(
+      CefRefPtr<CefBrowser> browser,
+      CefRefPtr<CefFrame> frame,
+      CefRefPtr<CefRequest> request,
+      CefRefPtr<CefCallback> callback) override {
+    CefURLParts parts;
+    if (CefParseURL(request->GetURL(), parts)) {
+      const std::string host = CefString(&parts.host).ToString();
+      if (IsBlockedHost(host)) {
+        return RV_CANCEL;
+      }
+    }
+    return RV_CONTINUE;
+  }
+
+  // Encode a downloaded favicon as PNG and forward it to Swift. Called on the
+  // UI thread (same as ClearCallbacks), so the cbs_ check is race-free.
+  void DeliverFavicon(CefRefPtr<CefImage> image) {
+    if (!cbs_.onFaviconChange || !image) {
+      return;
+    }
+    int width = 0, height = 0;
+    CefRefPtr<CefBinaryValue> png =
+        image->GetAsPNG(1.0f, /*with_transparency=*/true, width, height);
+    if (!png) {
+      return;
+    }
+    const size_t size = png->GetSize();
+    if (size == 0) {
+      return;
+    }
+    std::vector<unsigned char> buf(size);
+    png->GetData(buf.data(), size, 0);
+    cbs_.onFaviconChange(user_data_, buf.data(), static_cast<int>(size));
+  }
 
   // CefLifeSpanHandler
   void OnAfterCreated(CefRefPtr<CefBrowser> browser) override {
@@ -116,6 +221,17 @@ class KomoCefClient : public CefClient,
       cbs_.onURLChange(user_data_, s.c_str());
     }
   }
+  void OnFaviconURLChange(CefRefPtr<CefBrowser> browser,
+                          const std::vector<CefString>& icon_urls) override {
+    if (!cbs_.onFaviconChange || icon_urls.empty() || !browser) {
+      return;
+    }
+    // Download the first icon (CEF picks a sensible one), capped at 32px.
+    browser->GetHost()->DownloadImage(icon_urls.front(), /*is_favicon=*/true,
+                                      /*max_image_size=*/32,
+                                      /*bypass_cache=*/false,
+                                      new FaviconDownloadCallback(this));
+  }
 
   // CefLoadHandler
   void OnLoadingStateChange(CefRefPtr<CefBrowser> browser,
@@ -143,6 +259,15 @@ class KomoCefClient : public CefClient,
 
   IMPLEMENT_REFCOUNTING(KomoCefClient);
 };
+
+void FaviconDownloadCallback::OnDownloadImageFinished(
+    const CefString& image_url,
+    int http_status_code,
+    CefRefPtr<CefImage> image) {
+  if (image) {
+    client_->DeliverFavicon(image);
+  }
+}
 
 std::string BundleSubPath(const char* sub) {
   NSString* base = [[NSBundle mainBundle] bundlePath];
@@ -207,6 +332,16 @@ bool komo_cef_initialize(void) {
 
 void komo_cef_shutdown(void) {
   CefShutdown();
+}
+
+void komo_cef_set_blocklist(const char* const* domains, int count) {
+  std::lock_guard<std::mutex> lock(g_blocklist_mtx);
+  g_blocklist.clear();
+  for (int i = 0; i < count; ++i) {
+    if (domains[i] && domains[i][0]) {
+      g_blocklist.insert(domains[i]);
+    }
+  }
 }
 
 void* komo_cef_create_browser(void* nsview,

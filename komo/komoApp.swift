@@ -17,6 +17,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillFinishLaunching(_ notification: Notification) {
         if komo_cef_initialize() {
             NSLog("komo: Chromium engine (CEF) v%s initialized", komo_cef_version())
+            // Push the ad/tracker blocklist into the engine before any browsing.
+            AdBlocker.install()
         } else {
             NSLog("komo: CEF failed to initialize")
         }
